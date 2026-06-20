@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useMembers } from '../hooks/useMembers';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -17,6 +18,7 @@ export default function Settings() {
   const [newColor, setNewColor] = useState(PALETTE[0]);
 
   const gcal = useGoogleCalendar();
+  const work = useWorkSchedule();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
 
@@ -178,6 +180,36 @@ export default function Settings() {
               <p className="text-sm text-text-2">No Google accounts connected yet — pick a member and connect one above.</p>
             )}
           </>
+        )}
+      </section>
+
+      {/* Work schedule (CRFTD → ClickUp) */}
+      <section className="cd-card flex flex-col gap-3">
+        <div>
+          <h2 className="text-base font-bold text-text">Work schedule</h2>
+          <p className="mt-1 text-sm text-text-2">
+            Your CRFTD work blocks (scheduled ClickUp tasks) show on your lane of the family board.
+          </p>
+        </div>
+        {!work.configured ? (
+          <p className="rounded-btn border border-surface-3 bg-surface-1 p-3 text-sm text-text-2">
+            Not connected yet — add <code className="font-mono text-xs">CRFTD_SUPABASE_URL</code>,{' '}
+            <code className="font-mono text-xs">CRFTD_SUPABASE_SERVICE_ROLE_KEY</code> and{' '}
+            <code className="font-mono text-xs">CLICKUP_API_TOKEN</code> to enable.
+          </p>
+        ) : (
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-sm text-text">
+              Show as busy only
+              <span className="block text-xs text-text-2">Hide task titles — just show blocked work time.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={work.busyOnly}
+              onChange={(e) => work.setBusyOnly(e.target.checked)}
+              className="h-4 w-4 shrink-0"
+            />
+          </label>
         )}
       </section>
 

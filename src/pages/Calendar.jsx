@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useScheduleBlocks } from '../hooks/useScheduleBlocks';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import FamilyCalendar from '../components/calendar/FamilyCalendar';
 import MemberChip from '../components/members/MemberChip';
 
@@ -72,7 +73,9 @@ function AddBlockSheet({ seed, members, defaultMemberId, onClose, onSave }) {
 export default function Calendar() {
   const { household, members, activeMemberId } = useApp();
   const { blocks, addBlock, updateBlock, removeBlock } = useScheduleBlocks(household?.id);
-  const { events } = useGoogleCalendar();
+  const { events: gcalEvents } = useGoogleCalendar();
+  const { events: workEvents } = useWorkSchedule();
+  const events = useMemo(() => [...gcalEvents, ...workEvents], [gcalEvents, workEvents]);
   const [hidden, setHidden] = useState(() => new Set());
   const [sheet, setSheet] = useState(null);
 
