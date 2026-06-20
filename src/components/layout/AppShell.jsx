@@ -21,7 +21,7 @@ export default function AppShell() {
       <header className="flex items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
         <div className="flex items-center gap-2">
           <img src="/icons/icon.svg" alt="" className="h-7 w-7" />
-          <span className="text-sm font-bold text-text">{household?.name || 'Hearth'}</span>
+          <span className="text-sm font-bold text-text">{household?.name || 'Commons'}</span>
         </div>
         <MemberSwitcher variant="bar" />
       </header>

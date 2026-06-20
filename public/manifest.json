@@ -1,6 +1,6 @@
 {
-  "name": "Hearth — Family Hub",
-  "short_name": "Hearth",
+  "name": "Commons — Family Hub",
+  "short_name": "Commons",
   "description": "The family calendar, tasks, and notes hub for the kitchen wall and your phone.",
   "start_url": "/",
   "scope": "/",

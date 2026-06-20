@@ -15,7 +15,7 @@ export default function MemberSwitcher({ variant = 'bar' }) {
     return (
       <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8 bg-bg p-8 animate-fade-in">
         <div className="text-center">
-          <div className="cd-mono-label">Hearth</div>
+          <div className="cd-mono-label">Commons</div>
           <h1 className="mt-1 text-3xl font-bold text-text">Who's using this?</h1>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-6">

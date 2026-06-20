@@ -1,4 +1,4 @@
-# Hearth — Family Hub
+# Commons — Family Hub
 
 A family/home shared calendar, tasks, and notes hub. Built to run on a
 wall-mounted kitchen **touchscreen** (always-on kiosk) and on each person's
@@ -44,15 +44,11 @@ netlify dev
 This app is meant to live in its **own** GitHub repo / Supabase project /
 Netlify site, separate from CRFTD.
 
-### 1. New GitHub repo
+### 1. GitHub repo
 
-```bash
-cd family-cal          # this folder is self-contained
-git init && git add -A && git commit -m "Hearth: initial scaffold"
-# create an empty repo on GitHub, then:
-git remote add origin git@github.com:<you>/hearth.git
-git push -u origin main
-```
+Already done — this app lives in its own repo at
+`https://github.com/seanmarshall21/scheduler` (extracted from CRFTD's
+`family-cal/` subfolder, with none of CRFTD's history).
 
 ### 2. New Supabase project
 
@@ -80,7 +76,7 @@ git push -u origin main
 2. Put `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` in
    the Netlify env + local `.env`.
 3. See `netlify/functions/_shared/README.md` — the four staged `google-*`
-   functions need remapping from CRFTD's `calendar_connections` to Hearth's
+   functions need remapping from CRFTD's `calendar_connections` to Commons's
    `google_connections` table before they run.
 
 ## Data model

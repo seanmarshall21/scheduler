@@ -1,4 +1,4 @@
-/* Hearth data tokens. Structural theme (warm charcoal scale, oat surfaces,
+/* Commons data tokens. Structural theme (warm charcoal scale, oat surfaces,
  * terracotta accent) lives in tailwind.config.js. These are calendar block
  * CATEGORY colors, mirrored here as CSS vars for inline use where Tailwind
  * class names aren't convenient. */

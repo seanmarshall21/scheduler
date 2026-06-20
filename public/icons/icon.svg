@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hearth">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Commons">
   <rect width="512" height="512" rx="112" fill="#37322b"/>
-  <!-- warm hearth flame -->
+  <!-- warm flame mark -->
   <path d="M256 96c30 52-10 86-10 124 0 22 16 38 38 38 30 0 50-26 44-58 36 30 56 70 56 112 0 70-58 118-128 118S128 482 128 412c0-58 38-104 74-150 28-36 40-104 54-166z" fill="#e08a3c"/>
   <circle cx="256" cy="398" r="42" fill="#f3ece0"/>
 </svg>

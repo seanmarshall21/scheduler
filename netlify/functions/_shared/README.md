@@ -1,7 +1,7 @@
 # Netlify functions — Google Calendar
 
 The four `google-*.js` functions were lifted from CRFTD and **remapped to
-Hearth's schema**. They carry logic worth keeping:
+Commons's schema**. They carry logic worth keeping:
 
 - multi-account OAuth + access-token refresh
 - per-account treatment (`schedule_around` / `ask` / `show`)
@@ -11,13 +11,13 @@ Hearth's schema**. They carry logic worth keeping:
 - read + write (incl. recurrence: this event / whole series)
 - declined-event filtering
 
-## What the remap changed (CRFTD → Hearth)
+## What the remap changed (CRFTD → Commons)
 
-They now read Hearth's **`google_connections`** table (see
+They now read Commons's **`google_connections`** table (see
 `supabase/migrations/0001_init.sql`), keyed by **member** and scoped by
 **household** via RLS:
 
-| CRFTD (`calendar_connections`)   | Hearth (`google_connections`)                     |
+| CRFTD (`calendar_connections`)   | Commons (`google_connections`)                     |
 | -------------------------------- | ------------------------------------------------- |
 | `provider = 'google'` filter     | dropped (table is Google-only)                    |
 | keyed per auth user (`user_id`)  | keyed per **member** (`member_id` + `household_id`) |

@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// Hearth skin — a WARMER, home-y reskin of CRFTD's bento system. We keep the
+// Commons skin — a WARMER, home-y reskin of CRFTD's bento system. We keep the
 // structural token NAMES (forest scale, surface, text) so the cd- component
 // classes port over unchanged, but retint them warm: oat-paper canvas, warm
 // charcoal ink, terracotta accent (replacing CRFTD's lime). Per-person hues

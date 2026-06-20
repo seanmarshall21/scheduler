@@ -1,9 +1,9 @@
 {
-  "name": "hearth",
+  "name": "commons",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Hearth — a family/home shared calendar, tasks, and notes hub for the kitchen wall + phones.",
+  "description": "Commons — a family/home shared calendar, tasks, and notes hub for the kitchen wall + phones.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

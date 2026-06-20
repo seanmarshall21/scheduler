@@ -1,5 +1,5 @@
 -- ============================================================================
--- Hearth — Family Hub :: initial schema (Brief 01)
+-- Commons — Family Hub :: initial schema (Brief 01)
 -- Run via `supabase db push` or paste into the Supabase SQL editor.
 --
 -- AUTH MODEL (hybrid):

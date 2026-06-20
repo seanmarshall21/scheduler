@@ -1,5 +1,5 @@
 -- ============================================================================
--- Hearth — OPTIONAL dev seed. Run in the Supabase SQL editor AFTER you have
+-- Commons — OPTIONAL dev seed. Run in the Supabase SQL editor AFTER you have
 -- signed up at least one account in the app (so auth.users has a row). It
 -- creates one household, links it to your (most-recently-created) auth user,
 -- and adds a few sample members. Safe to edit names/colors before running.

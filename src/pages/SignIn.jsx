@@ -32,7 +32,7 @@ export default function SignIn() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
           <img src="/icons/icon.svg" alt="" className="h-14 w-14" />
-          <h1 className="mt-3 text-2xl font-bold text-text">Hearth</h1>
+          <h1 className="mt-3 text-2xl font-bold text-text">Commons</h1>
           <p className="mt-1 text-sm text-text-2">Your family's shared calendar, tasks & notes.</p>
         </div>
         {sent ? (

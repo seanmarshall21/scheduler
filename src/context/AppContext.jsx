@@ -12,7 +12,7 @@ import { useAuth } from './AuthContext';
 //   phone it defaults to the member linked to the logged-in user.
 const AppContext = createContext(null);
 
-const ACTIVE_KEY = 'hearth.activeMemberId';
+const ACTIVE_KEY = 'commons.activeMemberId';
 
 export function AppProvider({ children }) {
   const { user, loading: authLoading } = useAuth();

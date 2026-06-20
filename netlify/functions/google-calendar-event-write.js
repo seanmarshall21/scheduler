@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // POST /.netlify/functions/google-calendar-event-write
 //
-// Reschedule or remove one personal Google Calendar event from inside Hearth —
+// Reschedule or remove one personal Google Calendar event from inside Commons —
 // e.g. moving a personal event off the family board, or deleting it. Acts AS the
 // signed-in user, so RLS scopes the connection to the caller's household.
 // Requires the read/write calendar scope (calendar.events) on the connection.
