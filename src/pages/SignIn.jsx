@@ -56,7 +56,7 @@ export default function SignIn() {
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <img src="/icons/icon.svg" alt="" className="h-14 w-14" />
+          <img src="/icons/icon.svg" alt="" className="h-14 w-auto" />
           <h1 className="mt-3 text-2xl font-bold text-text">Commons</h1>
           <p className="mt-1 text-sm text-text-2">Your family's shared calendar, tasks &amp; notes.</p>
         </div>
