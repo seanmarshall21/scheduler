@@ -8,6 +8,7 @@ export default function Welcome() {
   const { household, createHousehold, loading } = useApp();
   const [name, setName] = useState('Our Home');
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
   const navigate = useNavigate();
 
   if (!loading && household) return <Navigate to="/" replace />;
@@ -15,9 +16,12 @@ export default function Welcome() {
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
+    setErr(null);
     try {
       await createHousehold(name);
       navigate('/settings');
+    } catch (e) {
+      setErr(e?.message || 'Could not create your home. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -36,6 +40,7 @@ export default function Welcome() {
           <button type="submit" disabled={busy} className="cd-btn cd-btn--accent cd-btn--kiosk">
             {busy ? 'Creating…' : 'Create home'}
           </button>
+          {err && <p className="text-sm text-red-600">{err}</p>}
         </div>
       </form>
     </div>

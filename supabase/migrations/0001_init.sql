@@ -153,12 +153,16 @@ alter table public.notes             enable row level security;
 
 -- Households: members of the household can read; creator can update; any
 -- authenticated user can create (they become created_by).
+-- The direct `created_by = auth.uid()` check is important: it lets the creator
+-- read/update their OWN household row without going through household_ids()
+-- (which is STABLE and can't see a just-inserted row during INSERT ... RETURNING
+-- — i.e. the client's `.insert().select()` during onboarding).
 create policy households_read on public.households
-  for select using (id in (select public.household_ids()));
+  for select using (created_by = auth.uid() or id in (select public.household_ids()));
 create policy households_insert on public.households
   for insert with check (created_by = auth.uid());
 create policy households_update on public.households
-  for update using (id in (select public.household_ids()));
+  for update using (created_by = auth.uid() or id in (select public.household_ids()));
 
 -- Members: full read/write within your household.
 create policy members_rw on public.members
