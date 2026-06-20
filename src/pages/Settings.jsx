@@ -1,18 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useMembers } from '../hooks/useMembers';
+import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
 
 export default function Settings() {
-  const { household } = useApp();
+  const { household, activeMemberId } = useApp();
   const { signOut } = useAuth();
   const { members, addMember, updateMember, deactivateMember } = useMembers();
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(PALETTE[0]);
+
+  const gcal = useGoogleCalendar();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
+
+  // Finish the OAuth handshake when Google redirects back to /settings.
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code && searchParams.get('state') === 'gcal') {
+      gcal.exchangeCode(code).finally(() => setSearchParams({}, { replace: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const add = (e) => {
     e.preventDefault();
@@ -21,6 +36,8 @@ export default function Settings() {
     setNewName('');
     setNewColor(PALETTE[(members.length + 1) % PALETTE.length]);
   };
+
+  const targetMember = connectMemberId || members[0]?.id || '';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 p-3 md:p-4">
@@ -65,14 +82,103 @@ export default function Settings() {
         </form>
       </section>
 
-      {/* Google Calendar — wiring lands in the next pass */}
-      <section className="cd-card">
-        <h2 className="text-base font-bold text-text">Google Calendar</h2>
-        <p className="mt-1 text-sm text-text-2">
-          Connect each member's Google account so their events show on the board. (Multi-account OAuth is
-          ported from CRFTD and wired up next.)
-        </p>
-        <button disabled className="cd-btn cd-btn--secondary mt-3">Connect Google — coming next</button>
+      {/* Google Calendar */}
+      <section className="cd-card flex flex-col gap-3">
+        <div>
+          <h2 className="text-base font-bold text-text">Google Calendar</h2>
+          <p className="mt-1 text-sm text-text-2">
+            Connect each person's Google account so their events show on the board, color-coded per member.
+            Choose to show full detail or just busy time, and pick which calendars appear.
+          </p>
+        </div>
+
+        {!gcal.configured ? (
+          <p className="rounded-btn border border-surface-3 bg-surface-1 p-3 text-sm text-text-2">
+            Not configured yet — add <code className="font-mono text-xs">VITE_GOOGLE_CLIENT_ID</code> (plus the
+            function secrets) and set up the Google OAuth client to enable connecting accounts.
+          </p>
+        ) : (
+          <>
+            {gcal.error && <p className="text-xs text-red-600">{gcal.error}</p>}
+
+            {/* Connect a new account, attached to a member */}
+            <div className="flex items-center gap-2">
+              <select
+                value={targetMember}
+                onChange={(e) => setConnectMemberId(e.target.value)}
+                className="cd-input !w-auto !py-2"
+                aria-label="Member to connect"
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => gcal.connect(targetMember)}
+                disabled={!targetMember}
+                className="cd-btn cd-btn--accent flex shrink-0 items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" /> Connect Google
+              </button>
+            </div>
+
+            {gcal.loading && <p className="cd-mono-label">loading…</p>}
+
+            {gcal.accounts.map((acct) => {
+              const member = members.find((m) => m.id === acct.memberId);
+              return (
+                <div key={acct.connId} className="flex flex-col gap-3 rounded-btn border border-surface-3 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-text">{acct.email}</p>
+                      <p className="cd-mono-label">
+                        {member ? member.name : 'unassigned'}{acct.error ? ' · couldn’t sync' : ''}
+                      </p>
+                    </div>
+                    <button onClick={() => gcal.disconnect(acct.connId)} className="text-text-3 hover:text-red-500" aria-label="Disconnect">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-text">
+                      Show as busy only
+                      <span className="block text-xs text-text-2">Hide titles — just show blocked time.</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(acct.busyOnly)}
+                      onChange={(e) => gcal.setBusyOnly(acct.connId, e.target.checked)}
+                      className="h-4 w-4 shrink-0"
+                    />
+                  </label>
+
+                  {acct.calendars?.length > 0 && (
+                    <div className="flex flex-col gap-1.5 border-t border-surface-2 pt-2">
+                      <p className="cd-mono-label">calendars shown</p>
+                      {acct.calendars.map((cal) => (
+                        <label key={cal.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={cal.enabled !== false}
+                            onChange={(e) => gcal.setCalendarEnabled(acct, cal.id, e.target.checked)}
+                            className="h-4 w-4 shrink-0"
+                          />
+                          {cal.color && <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: cal.color }} />}
+                          <span className="truncate text-sm text-text">{cal.name || cal.id}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {!gcal.loading && !gcal.accounts.length && (
+              <p className="text-sm text-text-2">No Google accounts connected yet — pick a member and connect one above.</p>
+            )}
+          </>
+        )}
       </section>
 
       <button onClick={signOut} className="cd-btn cd-btn--ghost self-start">Sign out</button>
