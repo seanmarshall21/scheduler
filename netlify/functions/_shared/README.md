@@ -1,7 +1,7 @@
-# Netlify functions — Google Calendar (staged from CRFTD)
+# Netlify functions — Google Calendar
 
-The four `google-*.js` functions here are **lifted verbatim from CRFTD** as a
-reference to adapt. They are battle-tested and carry logic worth keeping:
+The four `google-*.js` functions were lifted from CRFTD and **remapped to
+Hearth's schema**. They carry logic worth keeping:
 
 - multi-account OAuth + access-token refresh
 - per-account treatment (`schedule_around` / `ask` / `show`)
@@ -11,20 +11,39 @@ reference to adapt. They are battle-tested and carry logic worth keeping:
 - read + write (incl. recurrence: this event / whole series)
 - declined-event filtering
 
-## Adaptation needed before they run in Hearth
+## What the remap changed (CRFTD → Hearth)
 
-They currently read CRFTD's **`calendar_connections`** table and its column
-names. Hearth uses **`google_connections`** (see
-`supabase/migrations/0001_init.sql`) keyed by **member**. Remap:
+They now read Hearth's **`google_connections`** table (see
+`supabase/migrations/0001_init.sql`), keyed by **member** and scoped by
+**household** via RLS:
 
-| CRFTD (`calendar_connections`) | Hearth (`google_connections`)        |
-| ------------------------------ | ------------------------------------ |
-| `provider = 'google'`          | (table is Google-only — drop filter) |
-| `is_private`                   | `busy_only`                          |
-| `can_write`                    | derive from granted scope            |
-| `disabled_calendars` (array)   | `calendars` jsonb `[{id,enabled}]`   |
-| (per user via JWT)             | per **member**; scope by household   |
+| CRFTD (`calendar_connections`)   | Hearth (`google_connections`)                     |
+| -------------------------------- | ------------------------------------------------- |
+| `provider = 'google'` filter     | dropped (table is Google-only)                    |
+| keyed per auth user (`user_id`)  | keyed per **member** (`member_id` + `household_id`) |
+| `is_private`                     | `busy_only`                                       |
+| `can_write` column               | derived from Google `accessRole` (no column)      |
+| `disabled_calendars` (text[])    | `calendars` jsonb `[{ id, enabled }]`             |
+| `profiles.clickup_user_id` key   | events/busy keyed by `member_id`                  |
+| treatment `around/ask/show`      | treatment `schedule_around/ask/show`              |
 
-Also: events should be tagged with `member_id` so the calendar can color them
-per person. Wire `useGoogleCalendar` (to be ported) to call these and merge the
-returned events into `FamilyCalendar`'s `events` prop.
+Every event returned by `google-calendar-events` is tagged with `memberId` so
+`FamilyCalendar` can color it per person.
+
+## Client contract (for the `useGoogleCalendar` hook, still to be ported)
+
+- **`google-oauth-exchange`** — body `{ code, redirectUri, memberId? }`. The
+  kiosk (one shared login) must pass the active `memberId`; on a phone it
+  defaults to the member linked to the signed-in user. Connection is upserted on
+  `(member_id, google_email)`.
+- **`google-calendar-events`** — body `{ timeMin, timeMax }`. Returns
+  `{ connected, accounts, events }`; each event has `memberId`, `editable`, and
+  write handles (`connId`, `calId`, `gid`, `seriesId`).
+- **`google-calendar-team-busy`** — body `{ timeMin, timeMax }`. Returns
+  `{ configured, byPerson }` keyed by `member_id`; titles stripped when
+  `busy_only`. Needs `SUPABASE_SERVICE_ROLE_KEY`.
+- **`google-calendar-event-write`** — body
+  `{ connId, calId, gid, seriesId?, scope?, action: 'delete'|'patch', start?, end?, summary? }`.
+
+Remaining work: port `useGoogleCalendar` to call these and merge the events into
+`FamilyCalendar`'s `events` prop.

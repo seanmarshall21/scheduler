@@ -2,9 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 
 // POST /.netlify/functions/google-calendar-events
 //
-// Returns the signed-in user's Google Calendar events for a window, refreshing
-// the access token when needed. Used to show personal commitments on the
-// schedule and keep auto-plan from booking over them. Auth-gated by Supabase JWT.
+// Returns the household's connected Google Calendar events for a window,
+// refreshing access tokens when needed. Every event is tagged with `memberId`
+// so the family calendar can color it per person and merge it alongside the
+// app-native schedule blocks. Auth-gated by Supabase JWT; RLS scopes the
+// connections to the caller's household.
 //
 // Body: { timeMin (ISO), timeMax (ISO) }. Env: VITE_SUPABASE_URL,
 // VITE_SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
@@ -22,6 +24,11 @@ const json = (statusCode, body) => ({
 
 // Meetings the user has declined shouldn't show as busy time.
 const isDeclined = (e) => (e.attendees || []).some((a) => a.self && a.responseStatus === 'declined');
+
+// Per-calendar on/off lives in the `calendars` jsonb: [{ id, enabled }].
+// A calendar is off only when it's explicitly present with enabled === false.
+const disabledCalIds = (conn) =>
+  new Set((Array.isArray(conn.calendars) ? conn.calendars : []).filter((c) => c.enabled === false).map((c) => c.id));
 
 async function freshAccessToken(supabase, conn) {
   const expiry = conn.token_expiry ? new Date(conn.token_expiry).getTime() : 0;
@@ -41,7 +48,7 @@ async function freshAccessToken(supabase, conn) {
   const t = await res.json();
   if (!res.ok) throw new Error(t.error_description || t.error || 'Token refresh failed.');
   await supabase
-    .from('calendar_connections')
+    .from('google_connections')
     .update({
       access_token: t.access_token,
       token_expiry: new Date(Date.now() + (t.expires_in ?? 3600) * 1000).toISOString(),
@@ -78,10 +85,9 @@ export const handler = async (event) => {
   const { timeMin, timeMax } = payload;
   if (!timeMin || !timeMax) return json(400, { error: 'timeMin and timeMax are required.' });
 
-  const { data: conns, error: connErr } = await supabase
-    .from('calendar_connections')
-    .select('*')
-    .eq('provider', 'google');
+  // RLS returns every google_connection in the caller's household (one or more
+  // per member, across their Google accounts).
+  const { data: conns, error: connErr } = await supabase.from('google_connections').select('*');
   if (connErr) return json(500, { error: connErr.message });
   if (!conns || !conns.length) return json(200, { connected: false, events: [], accounts: [] });
 
@@ -95,13 +101,13 @@ export const handler = async (event) => {
 
       const listRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', { headers: auth });
       if (!listRes.ok) {
-        accounts.push({ email: conn.google_email, treatment: conn.treatment, isPrivate: conn.is_private, calendars: [], error: true });
+        accounts.push({ connId: conn.id, memberId: conn.member_id, email: conn.google_email, treatment: conn.treatment, busyOnly: conn.busy_only, calendars: [], error: true });
         continue;
       }
       const listBody = await listRes.json();
       const allCals = (listBody.items || []).filter((c) => c.selected !== false).slice(0, 20);
-      // Per-calendar curation: skip the ones the user switched off in Settings.
-      const disabled = new Set(conn.disabled_calendars || []);
+      // Per-calendar curation: skip the ones switched off in Settings.
+      const disabled = disabledCalIds(conn);
       const calendars = allCals.filter((c) => !disabled.has(c.id));
 
       const perCal = await Promise.all(
@@ -118,6 +124,9 @@ export const handler = async (event) => {
               .filter((e) => e.status !== 'cancelled' && !isDeclined(e) && (e.start?.dateTime || e.start?.date))
               .map((e) => ({
                 id: `${conn.id}:${e.id}`,
+                // Which person this event belongs to — drives the per-member
+                // color on the family calendar.
+                memberId: conn.member_id,
                 // Handles for write-back (reschedule / remove) — see
                 // google-calendar-event-write.
                 connId: conn.id,
@@ -129,17 +138,19 @@ export const handler = async (event) => {
                 // Stable across copies of the same meeting on different
                 // calendars/accounts — used to dedupe cross-account duplicates.
                 uid: e.iCalUID || null,
-                // Editable only when the account granted write scope AND this
-                // is the user's own event on a writable calendar.
-                editable: conn.can_write === true && e.organizer?.self !== false && cal.accessRole !== 'reader',
-                summary: e.summary || 'Busy',
+                // Editable when this is the user's own event on a writable
+                // calendar. (If the OAuth scope was read-only, a write attempt
+                // 403s and the write function reports it.)
+                editable: e.organizer?.self !== false && cal.accessRole !== 'reader',
+                // Privacy: busy-only accounts surface time, never titles.
+                summary: conn.busy_only ? 'Busy' : e.summary || 'Busy',
                 start: e.start.dateTime || e.start.date,
                 end: e.end?.dateTime || e.end?.date,
                 allDay: Boolean(e.start.date && !e.start.dateTime),
-                calendar: cal.summaryOverride || cal.summary,
+                calendar: conn.busy_only ? null : cal.summaryOverride || cal.summary,
                 color: cal.backgroundColor || null,
                 account: conn.google_email,
-                treatment: conn.treatment, // per-account: around | ask | show
+                treatment: conn.treatment, // per-account: schedule_around | ask | show
               }));
           } catch {
             return [];
@@ -150,10 +161,10 @@ export const handler = async (event) => {
       allEvents.push(...perCal.flat());
       accounts.push({
         connId: conn.id,
+        memberId: conn.member_id,
         email: conn.google_email,
         treatment: conn.treatment,
-        isPrivate: conn.is_private,
-        canWrite: conn.can_write === true,
+        busyOnly: conn.busy_only,
         // Every calendar on the account + whether it currently feeds the
         // schedule, so Settings can offer per-calendar on/off toggles.
         calendars: allCals.map((c) => ({
@@ -163,19 +174,21 @@ export const handler = async (event) => {
           enabled: !disabled.has(c.id),
         })),
       });
-    } catch (err) {
-      accounts.push({ connId: conn.id, email: conn.google_email, treatment: conn.treatment, isPrivate: conn.is_private, calendars: [], error: true });
+    } catch {
+      accounts.push({ connId: conn.id, memberId: conn.member_id, email: conn.google_email, treatment: conn.treatment, busyOnly: conn.busy_only, calendars: [], error: true });
     }
   }
 
   // Dedupe the same meeting appearing on multiple accounts/calendars (cross-
-  // invites between Sean's own emails, shared calendars, etc.) — one real event
-  // shown 5× looks like a 5-way overlap. Key by iCalUID + time; prefer an
-  // editable copy and the account whose treatment is most active.
-  const TREAT_RANK = { around: 0, ask: 1, show: 2 };
+  // invites between a member's own emails, shared calendars, etc.) — one real
+  // event shown 5× looks like a 5-way overlap. Key by iCalUID + time; prefer an
+  // editable copy and the account whose treatment is most active. Scoped per
+  // member so two people at the same meeting still each show it.
+  const TREAT_RANK = { schedule_around: 0, ask: 1, show: 2 };
   const byKey = new Map();
   for (const ev of allEvents) {
-    const key = ev.uid ? `${ev.uid}|${ev.start}` : `${ev.summary}|${ev.start}|${ev.end}`;
+    const base = ev.uid ? `${ev.uid}|${ev.start}` : `${ev.summary}|${ev.start}|${ev.end}`;
+    const key = `${ev.memberId}|${base}`;
     const prev = byKey.get(key);
     if (!prev) {
       byKey.set(key, ev);

@@ -2,11 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // POST /.netlify/functions/google-calendar-event-write
 //
-// Reschedule or remove one personal Google Calendar event from inside CRFTD —
-// e.g. the "Ask me" conflict prompt lets you move a personal event out of the
-// way of work, or delete it. Acts AS the signed-in user (their own RLS), so a
-// person can only touch their own connections/events. Requires the read/write
-// calendar scope (calendar.events) on the connection.
+// Reschedule or remove one personal Google Calendar event from inside Hearth —
+// e.g. moving a personal event off the family board, or deleting it. Acts AS the
+// signed-in user, so RLS scopes the connection to the caller's household.
+// Requires the read/write calendar scope (calendar.events) on the connection.
 //
 // Body: { connId, calId, gid, action: 'delete' | 'patch', start?, end? }
 //   - 'patch' moves the event: start/end are ISO datetimes.
@@ -42,7 +41,7 @@ async function freshAccessToken(supabase, conn) {
   const t = await res.json();
   if (!res.ok) throw new Error(t.error_description || t.error || 'Token refresh failed.');
   await supabase
-    .from('calendar_connections')
+    .from('google_connections')
     .update({
       access_token: t.access_token,
       token_expiry: new Date(Date.now() + (t.expires_in ?? 3600) * 1000).toISOString(),
@@ -84,9 +83,9 @@ export const handler = async (event) => {
   // just this occurrence.
   const targetId = scope === 'series' && seriesId ? seriesId : gid;
 
-  // RLS limits this to the caller's own connection row.
+  // RLS limits this to connections in the caller's household.
   const { data: conn, error: connErr } = await supabase
-    .from('calendar_connections')
+    .from('google_connections')
     .select('*')
     .eq('id', connId)
     .maybeSingle();
