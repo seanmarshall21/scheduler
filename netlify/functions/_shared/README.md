@@ -45,5 +45,12 @@ Every event returned by `google-calendar-events` is tagged with `memberId` so
 - **`google-calendar-event-write`** — body
   `{ connId, calId, gid, seriesId?, scope?, action: 'delete'|'patch', start?, end?, summary? }`.
 
-Remaining work: port `useGoogleCalendar` to call these and merge the events into
-`FamilyCalendar`'s `events` prop.
+Wired up: `src/hooks/useGoogleCalendar.js` drives the connect/exchange flow and
+loads events; the **Settings** page manages connections (busy-only + per-calendar
+toggles); `FamilyCalendar` renders the events per member. Browser needs
+`VITE_GOOGLE_CLIENT_ID`; the OAuth redirect returns to `/settings`.
+
+Separately, `crftd-schedule.js` bridges the CRFTD work schedule (reads CRFTD's
+`schedule_blocks` via service role + resolves ClickUp titles/colors) — see
+`src/hooks/useWorkSchedule.js`. Env: `CRFTD_SUPABASE_URL`,
+`CRFTD_SUPABASE_SERVICE_ROLE_KEY`, `CLICKUP_API_TOKEN`, `CLICKUP_USER_MAP`.

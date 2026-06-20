@@ -9,6 +9,11 @@ import { useAuth } from '../context/AuthContext';
 const DAY_MS = 86_400_000;
 const BUSY_KEY = 'commons.work.busyOnly';
 
+// Module cache so navigating between pages doesn't re-hit CRFTD + ClickUp every
+// time. Revalidates when stale or on demand.
+const cache = { blocks: [], configured: false, at: 0, has: false };
+const STALE_MS = 60_000;
+
 // day 'YYYY-MM-DD' + minutes-from-midnight → ISO (local clock preserved).
 function toISO(day, minOfDay) {
   const [y, m, d] = day.split('-').map(Number);
@@ -23,9 +28,9 @@ async function accessToken() {
 export function useWorkSchedule() {
   const { members, activeMemberId } = useApp();
   const { user } = useAuth();
-  const [blocks, setBlocks] = useState([]);
-  const [configured, setConfigured] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [blocks, setBlocks] = useState(cache.blocks);
+  const [configured, setConfigured] = useState(cache.configured);
+  const [loading, setLoading] = useState(!cache.has);
   const [busyOnly, setBusyOnlyState] = useState(() => localStorage.getItem(BUSY_KEY) === '1');
 
   // The member this user's work belongs to (their own member, else active).
@@ -35,7 +40,7 @@ export function useWorkSchedule() {
   );
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!cache.has) setLoading(true);
     try {
       const token = await accessToken();
       if (!token) return;
@@ -49,17 +54,21 @@ export function useWorkSchedule() {
         }),
       });
       const json = await res.json().catch(() => ({}));
-      setConfigured(Boolean(json.configured));
-      setBlocks(json.blocks || []);
+      cache.configured = Boolean(json.configured);
+      cache.blocks = json.blocks || [];
+      cache.at = Date.now();
+      cache.has = true;
+      setConfigured(cache.configured);
+      setBlocks(cache.blocks);
     } catch {
-      setBlocks([]);
+      /* keep last good cache */
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    if (!cache.has || Date.now() - cache.at > STALE_MS) load();
   }, [load]);
 
   const setBusyOnly = useCallback((v) => {

@@ -18,6 +18,12 @@ const SCOPE = 'https://www.googleapis.com/auth/calendar email';
 const PENDING_MEMBER_KEY = 'commons.gcal.pendingMemberId';
 const DAY_MS = 86_400_000;
 
+// Module cache: paint last result instantly across page navigations, revalidate
+// in the background, and only hit the Google-backed function when stale (or on a
+// mutation). Mirrors useScheduleBlocks.
+const cache = { connected: false, accounts: [], events: [], at: 0, has: false };
+const STALE_MS = 60_000;
+
 const redirectUri = () => `${window.location.origin}/settings`;
 
 async function accessToken() {
@@ -39,10 +45,10 @@ async function callFn(name, body) {
 }
 
 export function useGoogleCalendar() {
-  const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [accounts, setAccounts] = useState([]);
-  const [events, setEvents] = useState([]);
+  const [connected, setConnected] = useState(cache.connected);
+  const [accounts, setAccounts] = useState(cache.accounts);
+  const [events, setEvents] = useState(cache.events);
+  const [loading, setLoading] = useState(!cache.has);
   const [error, setError] = useState(null);
 
   const configured = Boolean(CLIENT_ID);
@@ -52,7 +58,7 @@ export function useGoogleCalendar() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!cache.has) setLoading(true);
     setError(null);
     try {
       const now = Date.now();
@@ -62,21 +68,24 @@ export function useGoogleCalendar() {
         'google-calendar-events',
         { timeMin, timeMax }
       );
-      setConnected(Boolean(conn));
-      setAccounts(accts || []);
       // FamilyCalendar reads `member_id`; the function returns `memberId`.
-      setEvents((evs || []).map((e) => ({ ...e, member_id: e.memberId })));
+      cache.connected = Boolean(conn);
+      cache.accounts = accts || [];
+      cache.events = (evs || []).map((e) => ({ ...e, member_id: e.memberId }));
+      cache.at = Date.now();
+      cache.has = true;
+      setConnected(cache.connected);
+      setAccounts(cache.accounts);
+      setEvents(cache.events);
     } catch (e) {
       setError(e.message);
-      setAccounts([]);
-      setEvents([]);
     } finally {
       setLoading(false);
     }
   }, [configured]);
 
   useEffect(() => {
-    load();
+    if (!cache.has || Date.now() - cache.at > STALE_MS) load();
   }, [load]);
 
   // Redirect to Google's consent screen. `memberId` is the family member this

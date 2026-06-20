@@ -17,7 +17,12 @@ Supabase project, its own Netlify site.
 - **Shared notes & checklists** — household notes everyone can add to / check off.
 - **Day-blocking** — drop time blocks (groceries, soccer, date night).
 - **Kiosk home** — big clock + today's combined agenda + quick "who am I" switch.
-- **Google Calendar (multi-account)** — ported from CRFTD; wiring in progress.
+- **Google Calendar (multi-account)** — connect each person's Google accounts;
+  per-account "busy only" (hide titles) and per-calendar on/off toggles. Events
+  show color-coded per member on the board.
+- **Work schedule bridge** — pulls your CRFTD scheduled work (ClickUp tasks) onto
+  your lane via a Commons-owned function (reads CRFTD's `schedule_blocks` +
+  resolves titles/colors from ClickUp). Built as a pluggable source.
 
 ## Stack
 
