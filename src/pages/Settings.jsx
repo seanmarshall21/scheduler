@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useMembers } from '../hooks/useMembers';
@@ -21,6 +21,7 @@ export default function Settings() {
   const work = useWorkSchedule();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
+  const [expandedConn, setExpandedConn] = useState(null);
 
   // Finish the OAuth handshake when Google redirects back to /settings.
   useEffect(() => {
@@ -128,48 +129,70 @@ export default function Settings() {
 
             {gcal.accounts.map((acct) => {
               const member = members.find((m) => m.id === acct.memberId);
+              const open = expandedConn === acct.connId;
               return (
-                <div key={acct.connId} className="flex flex-col gap-3 rounded-btn border border-surface-3 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-text">{acct.email}</p>
-                      <p className="cd-mono-label">
-                        {member ? member.name : 'unassigned'}{acct.error ? ' · couldn’t sync' : ''}
-                      </p>
-                    </div>
-                    <button onClick={() => gcal.disconnect(acct.connId)} className="text-text-3 hover:text-red-500" aria-label="Disconnect">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <label className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-text">
-                      Show as busy only
-                      <span className="block text-xs text-text-2">Hide titles — just show blocked time.</span>
+                <div key={acct.connId} className="rounded-btn border border-surface-3">
+                  {/* Collapsed header — tap to expand */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedConn(open ? null : acct.connId)}
+                    className="flex w-full items-center justify-between gap-2 p-3 text-left"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      {member && <MemberChip member={member} size={24} />}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-text">{acct.email}</span>
+                        <span className="cd-mono-label">
+                          {member ? member.name : 'unassigned'}
+                          {acct.busyOnly ? ' · busy only' : ''}
+                          {acct.error ? ' · couldn’t sync' : ''}
+                        </span>
+                      </span>
                     </span>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(acct.busyOnly)}
-                      onChange={(e) => gcal.setBusyOnly(acct.connId, e.target.checked)}
-                      className="h-4 w-4 shrink-0"
-                    />
-                  </label>
+                    {open
+                      ? <ChevronDown className="h-4 w-4 shrink-0 text-text-3" />
+                      : <ChevronRight className="h-4 w-4 shrink-0 text-text-3" />}
+                  </button>
 
-                  {acct.calendars?.length > 0 && (
-                    <div className="flex flex-col gap-1.5 border-t border-surface-2 pt-2">
-                      <p className="cd-mono-label">calendars shown</p>
-                      {acct.calendars.map((cal) => (
-                        <label key={cal.id} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={cal.enabled !== false}
-                            onChange={(e) => gcal.setCalendarEnabled(acct, cal.id, e.target.checked)}
-                            className="h-4 w-4 shrink-0"
-                          />
-                          {cal.color && <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: cal.color }} />}
-                          <span className="truncate text-sm text-text">{cal.name || cal.id}</span>
-                        </label>
-                      ))}
+                  {open && (
+                    <div className="flex flex-col gap-3 border-t border-surface-2 p-3">
+                      <label className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-text">
+                          Show as busy only
+                          <span className="block text-xs text-text-2">Hide titles — just show blocked time.</span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(acct.busyOnly)}
+                          onChange={(e) => gcal.setBusyOnly(acct.connId, e.target.checked)}
+                          className="h-4 w-4 shrink-0"
+                        />
+                      </label>
+
+                      {acct.calendars?.length > 0 && (
+                        <div className="flex flex-col gap-1.5 border-t border-surface-2 pt-2">
+                          <p className="cd-mono-label">calendars shown</p>
+                          {acct.calendars.map((cal) => (
+                            <label key={cal.id} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={cal.enabled !== false}
+                                onChange={(e) => gcal.setCalendarEnabled(acct, cal.id, e.target.checked)}
+                                className="h-4 w-4 shrink-0"
+                              />
+                              {cal.color && <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: cal.color }} />}
+                              <span className="truncate text-sm text-text">{cal.name || cal.id}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => gcal.disconnect(acct.connId)}
+                        className="flex items-center gap-1.5 self-start text-xs font-medium text-red-500 hover:text-red-600"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Disconnect
+                      </button>
                     </div>
                   )}
                 </div>
