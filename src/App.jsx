@@ -6,6 +6,7 @@ import AppShell from './components/layout/AppShell';
 
 import SignIn from './pages/SignIn';
 import Welcome from './pages/Welcome';
+import Join from './pages/Join';
 import Home from './pages/Home';
 import Calendar from './pages/Calendar';
 import Tasks from './pages/Tasks';
@@ -20,6 +21,7 @@ export default function App() {
           <Routes>
             <Route path="/signin" element={<SignIn />} />
             <Route path="/welcome" element={<Welcome />} />
+            <Route path="/join" element={<Join />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 <Route path="/" element={<Home />} />

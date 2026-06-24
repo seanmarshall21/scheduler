@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useMembers } from '../hooks/useMembers';
@@ -22,6 +22,14 @@ export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
   const [expandedConn, setExpandedConn] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyInvite = () => {
+    if (!household?.join_code) return;
+    navigator.clipboard?.writeText(`${window.location.origin}/join?key=${household.join_code}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   // Finish the OAuth handshake when Google redirects back to /settings.
   useEffect(() => {
@@ -48,6 +56,28 @@ export default function Settings() {
         <h2 className="mb-1 text-base font-bold text-text">{household?.name}</h2>
         <p className="cd-mono-label">household</p>
       </section>
+
+      {/* Open the door — invite to this household */}
+      {household?.join_code && (
+        <section className="cd-card flex flex-col gap-3">
+          <div>
+            <h2 className="text-base font-bold text-text">Open the door</h2>
+            <p className="mt-1 text-sm text-text-2">
+              Share your Commons Key so family can join this home and share calendars.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="cd-mono-label">Commons Key</span>
+            <code className="rounded-btn border border-surface-3 bg-surface-1 px-2 py-1 font-mono text-sm tracking-widest text-text">
+              {household.join_code}
+            </code>
+          </div>
+          <button onClick={copyInvite} className="cd-btn cd-btn--secondary flex items-center gap-1.5 self-start">
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied ? 'Invite link copied' : 'Copy invite link'}
+          </button>
+        </section>
+      )}
 
       {/* Members */}
       <section className="cd-card flex flex-col gap-3">

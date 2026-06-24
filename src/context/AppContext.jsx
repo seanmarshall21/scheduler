@@ -13,6 +13,7 @@ import { useAuth } from './AuthContext';
 const AppContext = createContext(null);
 
 const ACTIVE_KEY = 'commons.activeMemberId';
+const PENDING_JOIN_KEY = 'commons.pendingJoinKey';
 
 export function AppProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
@@ -31,6 +32,16 @@ export function AppProvider({ children }) {
       return;
     }
     setLoading(true);
+
+    // A pending Commons Key (from an /join invite link) → join that household
+    // before loading, so the user lands straight in the shared home.
+    const pendingKey = sessionStorage.getItem(PENDING_JOIN_KEY);
+    if (pendingKey) {
+      sessionStorage.removeItem(PENDING_JOIN_KEY);
+      const { error: joinErr } = await supabase.rpc('join_household_by_key', { p_key: pendingKey.trim() });
+      if (joinErr) console.error('[join] failed:', joinErr.message);
+    }
+
     // RLS returns only households this user belongs to. Take the first.
     const { data: houses } = await supabase
       .from('households')
@@ -92,6 +103,16 @@ export function AppProvider({ children }) {
     [user, load]
   );
 
+  // Join an existing household by its Commons Key (used in onboarding).
+  const joinByKey = useCallback(
+    async (key) => {
+      const { error } = await supabase.rpc('join_household_by_key', { p_key: (key || '').trim() });
+      if (error) throw error;
+      await load();
+    },
+    [load]
+  );
+
   const activeMember = members.find((m) => m.id === activeMemberId) ?? null;
 
   return (
@@ -105,6 +126,7 @@ export function AppProvider({ children }) {
         activeMember,
         setActiveMember,
         createHousehold,
+        joinByKey,
         refresh: load,
         setMembers,
       }}
