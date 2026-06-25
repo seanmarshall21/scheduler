@@ -19,10 +19,7 @@ const NAV = [
 // Per-page spotlight steps. Pages without their own steps get GENERIC.
 const TOURS = {
   '/': [
-    { selector: '[data-tour="home-clock"]', title: 'Today at a glance', body: 'The big clock and date — built to read across the kitchen. Everyone in the home shows up here.' },
-    { selector: '[data-tour="home-agenda"]', title: 'Today’s agenda', body: 'Everything scheduled today, color-coded per person. Tap “open calendar” for the full board.' },
-    { selector: '[data-tour="home-tasks"]', title: 'What’s due', body: 'Tasks due today (or what’s open). Tap “all” to manage them.' },
-    { selector: '[data-tour="home-fridge"]', title: 'The fridge', body: 'A shared board — doodle, drop a sticky note, or add a photo. It shows here and pops up for everyone when it changes.' },
+    { selector: '[data-tour="dash-edit"]', title: 'Make it yours', body: 'Tap Edit to drag, resize, add or remove the cards on this screen. Each device keeps its own layout — set up the kitchen kiosk and your phone differently.' },
     { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On the shared screen, tap here to switch which member you are.' },
   ],
   '/tasks': [
