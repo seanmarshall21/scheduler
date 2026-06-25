@@ -69,7 +69,7 @@ export default function Settings() {
 
       {/* Open the door — invite to this household */}
       {household?.join_code && (
-        <section className="cd-card flex flex-col gap-3">
+        <section data-tour="set-door" className="cd-card flex flex-col gap-3">
           <div>
             <h2 className="text-base font-bold text-text">Open the door</h2>
             <p className="mt-1 text-sm text-text-2">
@@ -126,7 +126,7 @@ export default function Settings() {
       </section>
 
       {/* Your calendars (app-native) */}
-      <section className="cd-card flex flex-col gap-3">
+      <section data-tour="set-calendars" className="cd-card flex flex-col gap-3">
         <div>
           <h2 className="text-base font-bold text-text">Your calendars</h2>
           <p className="mt-1 text-sm text-text-2">
@@ -167,7 +167,7 @@ export default function Settings() {
       </section>
 
       {/* Google Calendar */}
-      <section className="cd-card flex flex-col gap-3">
+      <section data-tour="set-google" className="cd-card flex flex-col gap-3">
         <div>
           <h2 className="text-base font-bold text-text">Google Calendar</h2>
           <p className="mt-1 text-sm text-text-2">

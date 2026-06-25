@@ -145,6 +145,7 @@ export default function FamilyCalendar({
   onAddBlock, // ({ member_id, day, start_min })
   onUpdateBlock, // (id, patch)
   onRemoveBlock, // (id)
+  onEventClick, // (event occurrence) — tap an event
   className = '',
 }) {
   const [view, setView] = useState(() =>
@@ -473,6 +474,7 @@ export default function FamilyCalendar({
                             originDayTs: c.dayTs, originMemberId: it.member_id,
                             color, name: label,
                           }, 'move') : undefined}
+                          onClick={isEvent && onEventClick ? () => onEventClick(it.raw) : undefined}
                           className={`absolute flex select-none flex-col gap-0.5 overflow-hidden rounded-lg px-1.5 py-1 ${
                             isEvent ? 'border-l-[3px]' : ''
                           } ${isDragged ? 'z-30 shadow-lg ring-2 ring-text/30' : isEditing ? 'z-20 ring-2 ring-text/25' : 'z-10'} ${
@@ -483,11 +485,11 @@ export default function FamilyCalendar({
                             backgroundColor: isEvent ? 'white' : `color-mix(in srgb, ${color} 16%, white)`,
                             borderLeftColor: isEvent ? color : undefined,
                             borderColor: it.unplaced ? `color-mix(in srgb, ${color} 40%, white)` : undefined,
-                            cursor: editable ? (isDragged ? 'grabbing' : 'grab') : 'default',
+                            cursor: editable ? (isDragged ? 'grabbing' : 'grab') : isEvent && onEventClick ? 'pointer' : 'default',
                             touchAction: isDragged ? 'none' : 'auto',
                             pointerEvents: isDragged ? 'none' : 'auto',
                           }}
-                          title={`${label}${isEvent ? ' · Google' : ''}`}
+                          title={label}
                         >
                           <span className="truncate text-[11px] font-bold" style={{ color: `color-mix(in srgb, ${color} 80%, black)` }}>
                             {label}

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { CalendarDays, CheckSquare, Home, Settings, StickyNote } from 'lucide-react';
+import { CalendarDays, CheckSquare, HelpCircle, Home, Settings, StickyNote } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import MemberSwitcher from '../members/MemberSwitcher';
+import Walkthrough from '../Walkthrough';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -11,19 +13,52 @@ const NAV = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
+// Per-page spotlight steps. Pages without their own steps get GENERIC.
+const TOURS = {
+  '/calendar': [
+    { selector: '[data-tour="cal-filter"]', title: 'Filter by person', body: 'Tap a person to show or hide their items on the board.' },
+    { selector: '[data-tour="cal-add-event"]', title: 'Add an event', body: 'Create an event on one of your own calendars — choose who it’s for, the time, and whether it repeats.' },
+    { selector: '[data-tour="cal-grid"]', title: 'The board', body: 'Everyone’s blocks and events, color-coded. Drag a block to move it; tap an event to edit or delete it.' },
+  ],
+  '/settings': [
+    { selector: '[data-tour="set-door"]', title: 'Open the door', body: 'Share your Commons Key so family can join this home and share calendars.' },
+    { selector: '[data-tour="set-calendars"]', title: 'Your calendars', body: 'Make in-app calendars for things that don’t belong in a work or email account.' },
+    { selector: '[data-tour="set-google"]', title: 'Connect Google', body: 'Add each person’s Google account, then choose busy-only or which calendars appear.' },
+  ],
+};
+const GENERIC = [
+  { selector: '[data-tour="nav"]', title: 'Welcome to Commons', body: 'Move between Home, Calendar, Tasks, Notes, and Settings here. Tap the “?” on any page for a quick tour of it.' },
+  { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On a shared screen, tap here to switch which family member you are.' },
+];
+
 export default function AppShell() {
   const { household } = useApp();
   const { pathname } = useLocation();
+  const [tour, setTour] = useState(false);
+
+  const steps = TOURS[pathname] || GENERIC;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Top bar */}
-      <header className="flex items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
+      <header data-tour="topbar" className="flex items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
         <div className="flex items-center gap-2">
           <img src="/icons/icon.svg" alt="" className="h-7 w-auto" />
           <span className="text-sm font-bold text-text">{household?.name || 'Commons'}</span>
         </div>
-        <MemberSwitcher variant="bar" />
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setTour(true)}
+            aria-label="Show me around this page"
+            title="Show me around this page"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1 hover:text-text"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
+          <span data-tour="whoami">
+            <MemberSwitcher variant="bar" />
+          </span>
+        </div>
       </header>
 
       {/* Page content */}
@@ -32,7 +67,7 @@ export default function AppShell() {
       </main>
 
       {/* Bottom nav (phones + touch); becomes a top-row tab bar on wide kiosks via CSS */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-surface-3 bg-surface-0/95 pb-safe backdrop-blur md:static md:justify-start md:gap-1 md:border-b md:border-t-0 md:px-3">
+      <nav data-tour="nav" className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-surface-3 bg-surface-0/95 pb-safe backdrop-blur md:static md:justify-start md:gap-1 md:border-b md:border-t-0 md:px-3">
         {NAV.map(({ to, label, icon: Icon, end }) => {
           const active = end ? pathname === to : pathname.startsWith(to);
           return (
@@ -50,6 +85,8 @@ export default function AppShell() {
           );
         })}
       </nav>
+
+      {tour && <Walkthrough steps={steps} onClose={() => setTour(false)} />}
     </div>
   );
 }

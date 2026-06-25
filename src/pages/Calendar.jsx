@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useScheduleBlocks } from '../hooks/useScheduleBlocks';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
@@ -79,22 +79,31 @@ function AddBlockSheet({ seed, members, defaultMemberId, onClose, onSave }) {
   );
 }
 
-function AddEventSheet({ calendars, members, defaultMemberId, addCalendar, addEvent, onClose }) {
-  const [title, setTitle] = useState('');
-  const [calendarId, setCalendarId] = useState(calendars[0]?.id || '__new__');
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function AddEventSheet({ event, calendars, members, defaultMemberId, addCalendar, addEvent, updateEvent, removeEvent, onClose }) {
+  const editing = Boolean(event);
+  const seedStart = editing ? new Date(event.starts_at) : null;
+  const seedMinutes = editing && event.ends_at
+    ? Math.max(15, Math.round((new Date(event.ends_at) - seedStart) / 60_000))
+    : 60;
+
+  const [title, setTitle] = useState(event?.title || '');
+  const [calendarId, setCalendarId] = useState(event?.calendar_id || calendars[0]?.id || '__new__');
   const [newCalName, setNewCalName] = useState('');
   const [newCalColor, setNewCalColor] = useState(CAL_COLORS[0]);
-  const [memberId, setMemberId] = useState(defaultMemberId || members[0]?.id || null);
-  const [date, setDate] = useState(todayISO());
-  const [time, setTime] = useState('09:00');
-  const [minutes, setMinutes] = useState(60);
-  const [repeat, setRepeat] = useState('none');
-  const [until, setUntil] = useState('');
-  const [notes, setNotes] = useState('');
+  const [memberId, setMemberId] = useState(event?.member_id || defaultMemberId || members[0]?.id || null);
+  const [date, setDate] = useState(editing ? `${seedStart.getFullYear()}-${pad2(seedStart.getMonth() + 1)}-${pad2(seedStart.getDate())}` : todayISO());
+  const [time, setTime] = useState(editing ? `${pad2(seedStart.getHours())}:${pad2(seedStart.getMinutes())}` : '09:00');
+  const [minutes, setMinutes] = useState(seedMinutes);
+  const [repeat, setRepeat] = useState(event?.repeat || 'none');
+  const [until, setUntil] = useState(event?.repeat_until || '');
+  const [notes, setNotes] = useState(event?.notes || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
   const creatingCal = calendarId === '__new__';
+  const lengthOptions = [...new Set([15, 30, 45, 60, 90, 120, 180, 240, minutes])].sort((a, b) => a - b);
 
   const save = async () => {
     if (!title.trim() || !memberId) return;
@@ -108,7 +117,7 @@ function AddEventSheet({ calendars, members, defaultMemberId, addCalendar, addEv
       }
       const startsAt = new Date(`${date}T${time}`);
       const ends = new Date(startsAt.getTime() + minutes * 60_000);
-      await addEvent({
+      const row = {
         calendar_id: calId,
         member_id: memberId,
         title: title.trim(),
@@ -117,7 +126,9 @@ function AddEventSheet({ calendars, members, defaultMemberId, addCalendar, addEv
         repeat,
         repeat_until: repeat !== 'none' && until ? until : null,
         notes: notes.trim() || null,
-      });
+      };
+      if (editing) await updateEvent(event.id, row);
+      else await addEvent(row);
       onClose();
     } catch (e) {
       setErr(e.message || 'Could not save the event.');
@@ -126,11 +137,23 @@ function AddEventSheet({ calendars, members, defaultMemberId, addCalendar, addEv
     }
   };
 
+  const del = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await removeEvent(event.id);
+      onClose();
+    } catch (e) {
+      setErr(e.message || 'Could not delete.');
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="cd-dialog-backdrop" onClick={onClose}>
       <div className="cd-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-text">New event</h3>
+          <h3 className="text-lg font-bold text-text">{editing ? 'Edit event' : 'New event'}</h3>
           <button onClick={onClose} className="text-text-3 hover:text-text"><X className="h-5 w-5" /></button>
         </div>
         <div className="flex flex-col gap-3">
@@ -172,7 +195,7 @@ function AddEventSheet({ calendars, members, defaultMemberId, addCalendar, addEv
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="cd-input !w-auto !py-2" />
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="cd-input !w-auto !py-2" />
             <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="cd-input !w-auto !py-2">
-              {[15, 30, 45, 60, 90, 120, 180, 240].map((n) => (<option key={n} value={n}>{n < 60 ? `${n}m` : `${n / 60}h`}</option>))}
+              {lengthOptions.map((n) => (<option key={n} value={n}>{n < 60 ? `${n}m` : `${n / 60}h`}</option>))}
             </select>
           </div>
 
@@ -192,9 +215,16 @@ function AddEventSheet({ calendars, members, defaultMemberId, addCalendar, addEv
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" rows={2} className="cd-input" />
 
           {err && <p className="text-xs text-red-600">{err}</p>}
-          <button onClick={save} disabled={busy || !title.trim() || (creatingCal && !newCalName.trim())} className="cd-btn cd-btn--accent cd-btn--kiosk">
-            {busy ? 'Saving…' : 'Add event'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={save} disabled={busy || !title.trim() || (creatingCal && !newCalName.trim())} className="cd-btn cd-btn--accent cd-btn--kiosk flex-1">
+              {busy ? 'Saving…' : editing ? 'Update event' : 'Add event'}
+            </button>
+            {editing && (
+              <button onClick={del} disabled={busy} className="cd-btn cd-btn--ghost flex items-center gap-1.5 text-red-500 hover:text-red-600">
+                <Trash2 className="h-4 w-4" /> Delete
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -207,7 +237,7 @@ export default function Calendar() {
   const { events: gcalEvents } = useGoogleCalendar();
   const { events: workEvents } = useWorkSchedule();
   const { calendars, addCalendar } = useCalendars(household?.id);
-  const { events: appRaw, addEvent } = useEvents(household?.id);
+  const { events: appRaw, addEvent, updateEvent, removeEvent } = useEvents(household?.id);
   const calendarsById = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars]);
   const appEvents = useMemo(() => {
     const now = Date.now();
@@ -220,6 +250,15 @@ export default function Calendar() {
   const [hidden, setHidden] = useState(() => new Set());
   const [sheet, setSheet] = useState(null);
   const [showEvent, setShowEvent] = useState(false);
+  const [editEvent, setEditEvent] = useState(null);
+
+  // Tap an app-native event on the board → open it for edit/delete. (Google /
+  // work events aren't editable here.)
+  const onEventClick = (occ) => {
+    if (occ?.source !== 'app') return;
+    const raw = appRaw.find((e) => e.id === occ.eventId);
+    if (raw) setEditEvent(raw);
+  };
 
   const visibleMemberIds = useMemo(
     () => members.filter((m) => !hidden.has(m.id)).map((m) => m.id),
@@ -236,7 +275,7 @@ export default function Calendar() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
       {/* Per-person filter chips */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div data-tour="cal-filter" className="flex flex-wrap items-center gap-2">
         {members.map((m) => {
           const on = !hidden.has(m.id);
           return (
@@ -247,22 +286,25 @@ export default function Calendar() {
             </button>
           );
         })}
-        <button onClick={() => setShowEvent(true)} className="cd-btn cd-btn--accent ml-auto flex items-center gap-1.5 !py-1.5">
+        <button data-tour="cal-add-event" onClick={() => setShowEvent(true)} className="cd-btn cd-btn--accent ml-auto flex items-center gap-1.5 !py-1.5">
           <Plus className="h-4 w-4" /> Event
         </button>
       </div>
 
-      <FamilyCalendar
-        className="min-h-0 flex-1"
-        members={members}
-        blocks={blocks}
-        events={events}
-        activeMemberId={activeMemberId}
-        visibleMemberIds={visibleMemberIds}
-        onAddBlock={(seed) => setSheet(seed)}
-        onUpdateBlock={updateBlock}
-        onRemoveBlock={removeBlock}
-      />
+      <div data-tour="cal-grid" className="flex min-h-0 flex-1 flex-col">
+        <FamilyCalendar
+          className="min-h-0 flex-1"
+          members={members}
+          blocks={blocks}
+          events={events}
+          activeMemberId={activeMemberId}
+          visibleMemberIds={visibleMemberIds}
+          onAddBlock={(seed) => setSheet(seed)}
+          onUpdateBlock={updateBlock}
+          onRemoveBlock={removeBlock}
+          onEventClick={onEventClick}
+        />
+      </div>
 
       {sheet && (
         <AddBlockSheet
@@ -274,14 +316,17 @@ export default function Calendar() {
         />
       )}
 
-      {showEvent && (
+      {(showEvent || editEvent) && (
         <AddEventSheet
+          event={editEvent}
           calendars={calendars}
           members={members}
           defaultMemberId={activeMemberId}
           addCalendar={addCalendar}
           addEvent={addEvent}
-          onClose={() => setShowEvent(false)}
+          updateEvent={updateEvent}
+          removeEvent={removeEvent}
+          onClose={() => { setShowEvent(false); setEditEvent(null); }}
         />
       )}
     </div>
