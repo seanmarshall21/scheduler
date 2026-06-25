@@ -80,6 +80,7 @@ export default function Fridge() {
     const c = canvasRef.current;
     if (!c || !c.width) return;
     const ctx = c.getContext('2d');
+    if (!ctx) return;
     ctx.clearRect(0, 0, c.width, c.height);
     const scale = c.width / VW;
     for (const s of strokesRef.current) drawStroke(ctx, s, scale);
@@ -118,14 +119,17 @@ export default function Fridge() {
   }, [strokes, items, ready]);
 
   const toV = (e) => {
-    const r = boardRef.current.getBoundingClientRect();
+    const el = boardRef.current;
+    if (!el) return [0, 0];
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return [0, 0];
     return [((e.clientX - r.left) / r.width) * VW, ((e.clientY - r.top) / r.height) * VH];
   };
   const clampV = (x, y) => [Math.max(0, Math.min(VW, x)), Math.max(0, Math.min(VH, y))];
 
   const onPenDown = (e) => {
     if (mode !== 'draw') return;
-    canvasRef.current.setPointerCapture(e.pointerId);
+    try { canvasRef.current?.setPointerCapture(e.pointerId); } catch { /* noop */ }
     drawing.current = { c: penColor, w: 6, p: [clampV(...toV(e))] };
   };
   const onPenMove = (e) => {

@@ -128,7 +128,7 @@ export default function Settings() {
                 onBlur={(e) => e.target.value !== m.name && updateMember(m.id, { name: e.target.value })}
                 className="min-w-0 flex-1 bg-transparent text-sm font-medium text-text focus:outline-none"
               />
-              <div className="flex gap-1">
+              <div className="flex min-w-0 flex-wrap justify-end gap-1">
                 {PALETTE.map((c) => (
                   <button key={c} onClick={() => updateMember(m.id, { color: c })}
                     className={`h-5 w-5 rounded-full transition-transform ${m.color === c ? 'scale-110 ring-2 ring-offset-1' : ''}`}
@@ -169,7 +169,7 @@ export default function Settings() {
                 onBlur={(e) => e.target.value !== c.name && cal.updateCalendar(c.id, { name: e.target.value })}
                 className="min-w-0 flex-1 bg-transparent text-sm font-medium text-text focus:outline-none"
               />
-              <div className="flex gap-1">
+              <div className="flex min-w-0 flex-wrap justify-end gap-1">
                 {PALETTE.slice(0, 6).map((col) => (
                   <button key={col} onClick={() => cal.updateCalendar(c.id, { color: col })}
                     className={`h-5 w-5 rounded-full ${c.color === col ? 'ring-2 ring-offset-1' : ''}`} style={{ backgroundColor: col }} aria-label={`color ${col}`} />

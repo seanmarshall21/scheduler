@@ -109,7 +109,7 @@ export default function AppShell() {
       </header>
 
       {/* Page content — the only scroll area */}
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-20 md:pb-0">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-20 md:pb-0">
         <Outlet />
       </main>
 
