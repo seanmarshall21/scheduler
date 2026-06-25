@@ -7,7 +7,7 @@ import { useMembers } from '../hooks/useMembers';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
-import { onVoicesReady, getVoiceName, setVoiceName, speak } from '../lib/speech';
+import { onVoicesReady, getVoiceName, setVoiceName, speak, usableVoices } from '../lib/speech';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -338,7 +338,7 @@ export default function Settings() {
               className="cd-input min-w-0 flex-1 !py-2"
             >
               <option value="">Auto (best available)</option>
-              {voices.filter((v) => /^en/i.test(v.lang)).map((v) => (
+              {usableVoices(voices).map((v) => (
                 <option key={v.name} value={v.name}>{v.name}</option>
               ))}
             </select>

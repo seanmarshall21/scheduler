@@ -78,9 +78,9 @@ export default function AppShell() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* Top bar */}
-      <header data-tour="topbar" className="flex items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* Top bar — pinned, full width */}
+      <header data-tour="topbar" className="flex shrink-0 items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
         <div className="flex items-center gap-2">
           <img src="/icons/icon.svg" alt="" className="h-7 w-auto" />
           <span className="text-sm font-bold text-text">{household?.name || 'Commons'}</span>
@@ -108,13 +108,13 @@ export default function AppShell() {
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="flex min-h-0 flex-1 flex-col pb-20 md:pb-0">
+      {/* Page content — the only scroll area */}
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-20 md:pb-0">
         <Outlet />
       </main>
 
-      {/* Bottom nav (phones + touch); becomes a top-row tab bar on wide kiosks via CSS */}
-      <nav data-tour="nav" className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-surface-3 bg-surface-0/95 pb-safe backdrop-blur md:static md:justify-start md:gap-1 md:border-b md:border-t-0 md:px-3">
+      {/* Bottom nav — pinned to the bottom, full width, on every size */}
+      <nav data-tour="nav" className="fixed inset-x-0 bottom-0 z-40 flex shrink-0 items-stretch justify-around border-t border-surface-3 bg-surface-0/95 pb-safe backdrop-blur md:static">
         {NAV.map(({ to, label, icon: Icon, end }) => {
           const active = end ? pathname === to : pathname.startsWith(to);
           return (
@@ -154,7 +154,7 @@ export default function AppShell() {
         onClick={() => setAssistantOpen(true)}
         data-tour="ask"
         aria-label="Ask Commons"
-        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-text text-white shadow-lg transition-transform hover:scale-105 md:bottom-6"
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-text text-white shadow-lg transition-transform hover:scale-105 md:right-6"
       >
         <Sparkles className="h-6 w-6" />
       </button>

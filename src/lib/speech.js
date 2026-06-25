@@ -7,11 +7,18 @@ export function listVoices() {
   return typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
 }
 
-// Pick the nicest English voice available (avoids the old robotic default).
+// English voices worth offering — drops the legacy local Microsoft voices
+// (David/Zira/etc.), which sound robotic.
+export function usableVoices(voices) {
+  return voices.filter((v) => /^en(-|_|$)/i.test(v.lang) && !/microsoft/i.test(v.name));
+}
+
+// Pick the nicest available English voice, preferring Google.
 export function preferredVoice(voices) {
-  const en = voices.filter((v) => /^en(-|_|$)/i.test(v.lang));
-  const nice = en.find((v) => /natural|neural|online|google|samantha|premium|aria|jenny|libby|sonia|ava|siri/i.test(v.name));
-  return nice || en.find((v) => v.default) || en[0] || voices[0] || null;
+  const list = usableVoices(voices);
+  const google = list.find((v) => /google/i.test(v.name));
+  const nice = list.find((v) => /natural|neural|online|samantha|premium|aria|jenny|libby|sonia|ava|siri/i.test(v.name));
+  return google || nice || list.find((v) => v.default) || list[0] || voices.find((v) => /^en/i.test(v.lang)) || voices[0] || null;
 }
 
 export function getVoiceName() {
