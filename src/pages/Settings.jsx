@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMembers } from '../hooks/useMembers';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
+import { useCalendars } from '../hooks/useCalendars';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -19,6 +20,8 @@ export default function Settings() {
 
   const gcal = useGoogleCalendar();
   const work = useWorkSchedule();
+  const cal = useCalendars(household?.id);
+  const [newCalName, setNewCalName] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
   const [expandedConn, setExpandedConn] = useState(null);
@@ -46,6 +49,13 @@ export default function Settings() {
     addMember({ name: newName.trim(), color: newColor });
     setNewName('');
     setNewColor(PALETTE[(members.length + 1) % PALETTE.length]);
+  };
+
+  const addCal = (e) => {
+    e.preventDefault();
+    if (!newCalName.trim()) return;
+    cal.addCalendar({ name: newCalName.trim(), color: PALETTE[cal.calendars.length % PALETTE.length] });
+    setNewCalName('');
   };
 
   const targetMember = connectMemberId || members[0]?.id || '';
@@ -111,6 +121,47 @@ export default function Settings() {
             ))}
           </span>
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Add a member…" className="cd-input flex-1 !py-2" />
+          <button type="submit" className="cd-btn cd-btn--accent shrink-0"><Plus className="h-4 w-4" /></button>
+        </form>
+      </section>
+
+      {/* Your calendars (app-native) */}
+      <section className="cd-card flex flex-col gap-3">
+        <div>
+          <h2 className="text-base font-bold text-text">Your calendars</h2>
+          <p className="mt-1 text-sm text-text-2">
+            In-app calendars for things that don't live in a work or email account. Add events to them on the Calendar tab.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          {cal.calendars.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 rounded-btn border border-surface-3 p-2">
+              <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+              <input
+                defaultValue={c.name}
+                onBlur={(e) => e.target.value !== c.name && cal.updateCalendar(c.id, { name: e.target.value })}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-text focus:outline-none"
+              />
+              <div className="flex gap-1">
+                {PALETTE.slice(0, 6).map((col) => (
+                  <button key={col} onClick={() => cal.updateCalendar(c.id, { color: col })}
+                    className={`h-5 w-5 rounded-full ${c.color === col ? 'ring-2 ring-offset-1' : ''}`} style={{ backgroundColor: col }} aria-label={`color ${col}`} />
+                ))}
+              </div>
+              <label className="flex shrink-0 items-center gap-1 text-xs text-text-2">
+                <input type="checkbox" checked={c.is_visible !== false}
+                  onChange={(e) => cal.updateCalendar(c.id, { is_visible: e.target.checked })} className="h-4 w-4" />
+                shown
+              </label>
+              <button onClick={() => cal.removeCalendar(c.id)} className="text-text-3 hover:text-red-500" aria-label="Delete calendar">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          {!cal.calendars.length && <p className="text-sm text-text-2">No calendars yet — add one below or from "+ Event".</p>}
+        </div>
+        <form onSubmit={addCal} className="flex items-center gap-2 border-t border-surface-2 pt-3">
+          <input value={newCalName} onChange={(e) => setNewCalName(e.target.value)} placeholder="New calendar (e.g. Kids, Family)…" className="cd-input flex-1 !py-2" />
           <button type="submit" className="cd-btn cd-btn--accent shrink-0"><Plus className="h-4 w-4" /></button>
         </form>
       </section>

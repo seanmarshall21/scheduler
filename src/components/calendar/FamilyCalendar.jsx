@@ -110,7 +110,7 @@ function eventsForDay(events, dayTs, memberId = null) {
     const ed = new Date(Math.min(e, dayEnd));
     const startMin = clamp(sd.getHours() * 60 + sd.getMinutes(), CAL_START, CAL_END - 15);
     const endMin = clamp(ed.getHours() * 60 + ed.getMinutes() || CAL_END, startMin + 15, CAL_END);
-    out.push({ kind: 'event', id: `ev-${ev.id}`, raw: ev, member_id: ev.member_id, summary: ev.summary, start: startMin, end: endMin });
+    out.push({ kind: 'event', id: `ev-${ev.id}`, raw: ev, member_id: ev.member_id, summary: ev.summary, start: startMin, end: endMin, color: ev.color ?? null });
   }
   return out;
 }
@@ -450,7 +450,9 @@ export default function FamilyCalendar({
                       if (!ok) return null;
                     }
                     if (!isDragged && isOverflow(layout, it.id)) return null;
-                    const color = colorOf(it.member_id);
+                    // Calendar events use their own calendar/source color; draggable
+                    // blocks stay in the member's color.
+                    const color = (it.kind === 'event' && it.color) || colorOf(it.member_id);
                     const sMin = isDragged ? drag.curStart : it.start;
                     const dur = isDragged ? drag.curMinutes : it.end - it.start;
                     const eMin = Math.min(CAL_END, sMin + Math.max(30, dur));
