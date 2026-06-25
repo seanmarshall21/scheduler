@@ -32,7 +32,7 @@ export default function Tasks() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
-      <form onSubmit={add} className="cd-card flex flex-col gap-2">
+      <form data-tour="task-add" onSubmit={add} className="cd-card flex flex-col gap-2">
         <div className="flex gap-2">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a task for someone…" className="cd-input flex-1" />
           <button type="submit" className="cd-btn cd-btn--accent shrink-0"><Plus className="h-4 w-4" /></button>
@@ -46,7 +46,7 @@ export default function Tasks() {
         </div>
       </form>
 
-      <div className="flex gap-1.5">
+      <div data-tour="task-filter" className="flex gap-1.5">
         {['all', 'open', 'mine'].map((f) => (
           <button key={f} onClick={() => setFilter(f)}
             className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase transition-colors ${filter === f ? 'bg-text text-white' : 'bg-surface-1 text-text-2'}`}>
@@ -55,7 +55,7 @@ export default function Tasks() {
         ))}
       </div>
 
-      <div className="cd-scroll flex flex-col gap-1.5">
+      <div data-tour="task-list" className="cd-scroll flex flex-col gap-1.5">
         {shown.length === 0 && <p className="cd-mono-label py-10 text-center">no tasks</p>}
         {shown.map((t) => {
           const m = memberById.get(t.assigned_to);

@@ -15,6 +15,21 @@ const NAV = [
 
 // Per-page spotlight steps. Pages without their own steps get GENERIC.
 const TOURS = {
+  '/': [
+    { selector: '[data-tour="home-clock"]', title: 'Today at a glance', body: 'The big clock and date — built to read across the kitchen. Everyone in the home shows up here.' },
+    { selector: '[data-tour="home-agenda"]', title: 'Today’s agenda', body: 'Everything scheduled today, color-coded per person. Tap “open calendar” for the full board.' },
+    { selector: '[data-tour="home-tasks"]', title: 'What’s due', body: 'Tasks due today (or what’s open). Tap “all” to manage them.' },
+    { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On the shared screen, tap here to switch which family member you are.' },
+  ],
+  '/tasks': [
+    { selector: '[data-tour="task-add"]', title: 'Add a task', body: 'Type a task, assign it to someone, and give it a due date.' },
+    { selector: '[data-tour="task-filter"]', title: 'Filter', body: 'Show all tasks, just the open ones, or only yours.' },
+    { selector: '[data-tour="task-list"]', title: 'The list', body: 'Check off, reassign, or delete a task. Overdue items turn red.' },
+  ],
+  '/notes': [
+    { selector: '[data-tour="note-add"]', title: 'Note or list', body: 'Jot a quick note, or start a shared checklist (like groceries) anyone can add to.' },
+    { selector: '[data-tour="note-grid"]', title: 'Your notes', body: 'Everything the household has jotted. Edit in place; check off list items together.' },
+  ],
   '/calendar': [
     { selector: '[data-tour="cal-filter"]', title: 'Filter by person', body: 'Tap a person to show or hide their items on the board.' },
     { selector: '[data-tour="cal-add-event"]', title: 'Add an event', body: 'Create an event on one of your own calendars — choose who it’s for, the time, and whether it repeats.' },

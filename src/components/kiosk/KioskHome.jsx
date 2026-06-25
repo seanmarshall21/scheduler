@@ -45,7 +45,7 @@ export default function KioskHome() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       {/* Clock + greeting */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div data-tour="home-clock" className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="cd-mono-label">{greeting}</div>
           <div className="text-6xl font-bold leading-none text-text md:text-7xl">
@@ -64,7 +64,7 @@ export default function KioskHome() {
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-3">
         {/* Today's agenda — spans two columns */}
-        <section className="cd-card flex min-h-0 flex-col lg:col-span-2">
+        <section data-tour="home-agenda" className="cd-card flex min-h-0 flex-col lg:col-span-2">
           <header className="mb-2 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-base font-bold text-text"><CalendarDays className="h-4 w-4" /> Today</h2>
             <Link to="/calendar" className="cd-mono-label hover:text-text">open calendar →</Link>
@@ -90,7 +90,7 @@ export default function KioskHome() {
 
         {/* Right rail: tasks due + quick links */}
         <div className="flex min-h-0 flex-col gap-4">
-          <section className="cd-card flex min-h-0 flex-1 flex-col">
+          <section data-tour="home-tasks" className="cd-card flex min-h-0 flex-1 flex-col">
             <header className="mb-2 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-base font-bold text-text"><CheckSquare className="h-4 w-4" /> Tasks</h2>
               <Link to="/tasks" className="cd-mono-label hover:text-text">all →</Link>

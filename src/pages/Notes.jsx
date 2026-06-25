@@ -23,14 +23,14 @@ export default function Notes() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
-      <div className="cd-card flex items-center gap-2">
+      <div data-tour="note-add" className="cd-card flex items-center gap-2">
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Jot a note or start a list…"
           className="cd-input flex-1" onKeyDown={(e) => e.key === 'Enter' && addNote('note')} />
         <button onClick={() => addNote('note')} className="cd-btn cd-btn--secondary shrink-0" title="Add note"><StickyNote className="h-4 w-4" /></button>
         <button onClick={() => addNote('list')} className="cd-btn cd-btn--accent shrink-0" title="Start list"><ListChecks className="h-4 w-4" /></button>
       </div>
 
-      <div className="cd-scroll grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div data-tour="note-grid" className="cd-scroll grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {notes.length === 0 && <p className="cd-mono-label col-span-full py-10 text-center">nothing here yet</p>}
         {notes.map((n) => (
           <div key={n.id} className="cd-card flex flex-col gap-2">
