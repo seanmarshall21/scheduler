@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { CalendarDays, CheckSquare, HelpCircle, Home, PenLine, Settings, StickyNote } from 'lucide-react';
+import { CalendarDays, CheckSquare, HelpCircle, Home, PenLine, Settings, Sparkles, StickyNote } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useWhiteboard } from '../../hooks/useWhiteboard';
 import MemberSwitcher from '../members/MemberSwitcher';
 import Walkthrough from '../Walkthrough';
 import WhiteboardPreview from '../fridge/WhiteboardPreview';
+import Assistant from '../assistant/Assistant';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -54,8 +55,12 @@ export default function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [tour, setTour] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
-  const steps = TOURS[pathname] || GENERIC;
+  const steps = [
+    ...(TOURS[pathname] || GENERIC),
+    { selector: '[data-tour="ask"]', title: 'Ask Commons', body: 'Your assistant. Ask “anything Thursday?”, or tell it to add a task, an event, or a list item — by text or voice.' },
+  ];
 
   // Fridge sign-in alert: pop the whiteboard once per app load if it changed.
   const { board } = useWhiteboard(household?.id);
@@ -144,6 +149,16 @@ export default function AppShell() {
           </div>
         </div>
       )}
+
+      <button
+        onClick={() => setAssistantOpen(true)}
+        data-tour="ask"
+        aria-label="Ask Commons"
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-text text-white shadow-lg transition-transform hover:scale-105 md:bottom-6"
+      >
+        <Sparkles className="h-6 w-6" />
+      </button>
+      {assistantOpen && <Assistant onClose={() => setAssistantOpen(false)} />}
     </div>
   );
 }
