@@ -1,19 +1,20 @@
-// Spoken replies for the assistant. Browser speech-synthesis voices vary wildly
-// by device; we prefer the higher-quality "natural / online / Google" voices and
-// let the user override the choice in Settings.
-const VOICE_KEY = 'commons.assistant.voice';
+import { supabase } from './supabase';
 
+// Spoken replies for the assistant. Prefers Google Cloud TTS (lifelike) when the
+// server has it configured; otherwise falls back to the browser's built-in
+// voices (preferring Google, dropping the robotic local Microsoft ones).
+const VOICE_KEY = 'commons.assistant.voice'; // browser voice name
+const CLOUD_VOICE_KEY = 'commons.assistant.cloudVoice'; // Google Cloud voice id
+
+// ── Browser voices ──────────────────────────────────────────────────────────
 export function listVoices() {
   return typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
 }
 
-// English voices worth offering — drops the legacy local Microsoft voices
-// (David/Zira/etc.), which sound robotic.
 export function usableVoices(voices) {
   return voices.filter((v) => /^en(-|_|$)/i.test(v.lang) && !/microsoft/i.test(v.name));
 }
 
-// Pick the nicest available English voice, preferring Google.
 export function preferredVoice(voices) {
   const list = usableVoices(voices);
   const google = list.find((v) => /google/i.test(v.name));
@@ -28,7 +29,6 @@ export function setVoiceName(name) {
   if (typeof localStorage !== 'undefined') localStorage.setItem(VOICE_KEY, name || '');
 }
 
-// Voices load asynchronously on some browsers — call back when they're ready.
 export function onVoicesReady(cb) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   const v = listVoices();
@@ -36,14 +36,69 @@ export function onVoicesReady(cb) {
   window.speechSynthesis.addEventListener('voiceschanged', () => cb(listVoices()), { once: true });
 }
 
-export function speak(text) {
+function speakBrowser(text) {
   if (typeof window === 'undefined' || !window.speechSynthesis || !text) return;
   const u = new SpeechSynthesisUtterance(text);
   const voices = listVoices();
   const chosen = voices.find((v) => v.name === getVoiceName()) || preferredVoice(voices);
   if (chosen) u.voice = chosen;
-  u.rate = 1;
-  u.pitch = 1;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
+}
+
+// ── Cloud (Google) TTS ──────────────────────────────────────────────────────
+let ttsConfig = null; // { configured, voices }
+let audioEl = null;
+
+async function authToken() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
+export async function ttsStatus() {
+  if (ttsConfig) return ttsConfig;
+  try {
+    const token = await authToken();
+    const res = await fetch('/.netlify/functions/tts', { headers: { Authorization: `Bearer ${token}` } });
+    ttsConfig = await res.json();
+  } catch {
+    ttsConfig = { configured: false, voices: [] };
+  }
+  return ttsConfig;
+}
+
+export function getCloudVoice() {
+  return (typeof localStorage !== 'undefined' && localStorage.getItem(CLOUD_VOICE_KEY)) || '';
+}
+export function setCloudVoice(id) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(CLOUD_VOICE_KEY, id || '');
+}
+
+async function speakCloud(text) {
+  const token = await authToken();
+  const res = await fetch('/.netlify/functions/tts', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice: getCloudVoice() || undefined }),
+  });
+  const data = await res.json();
+  if (!data.audio) throw new Error('no audio');
+  if (!audioEl) audioEl = new Audio();
+  audioEl.src = `data:audio/mp3;base64,${data.audio}`;
+  await audioEl.play();
+}
+
+// Speak `text` — Google Cloud TTS if available, else the browser voice.
+export async function speak(text) {
+  if (!text) return;
+  const cfg = await ttsStatus();
+  if (cfg?.configured) {
+    try {
+      await speakCloud(text);
+      return;
+    } catch {
+      /* fall through to browser */
+    }
+  }
+  speakBrowser(text);
 }

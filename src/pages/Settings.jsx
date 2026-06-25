@@ -7,7 +7,7 @@ import { useMembers } from '../hooks/useMembers';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
-import { onVoicesReady, getVoiceName, setVoiceName, speak, usableVoices } from '../lib/speech';
+import { onVoicesReady, getVoiceName, setVoiceName, speak, usableVoices, ttsStatus, getCloudVoice, setCloudVoice } from '../lib/speech';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -25,6 +25,8 @@ export default function Settings() {
   const [newCalName, setNewCalName] = useState('');
   const [voices, setVoices] = useState([]);
   const [voiceName, setVoiceNameState] = useState(getVoiceName());
+  const [tts, setTts] = useState(null);
+  const [cloudVoice, setCloudVoiceState] = useState(getCloudVoice());
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
   const [expandedConn, setExpandedConn] = useState(null);
@@ -48,6 +50,7 @@ export default function Settings() {
 
   useEffect(() => {
     onVoicesReady(setVoices);
+    ttsStatus().then(setTts);
   }, []);
 
   const add = (e) => {
@@ -328,26 +331,41 @@ export default function Settings() {
       <section className="cd-card flex flex-col gap-3">
         <div>
           <h2 className="text-base font-bold text-text">Assistant voice</h2>
-          <p className="mt-1 text-sm text-text-2">The voice Commons uses when it reads replies aloud.</p>
+          <p className="mt-1 text-sm text-text-2">
+            The voice Commons uses when it reads replies aloud.{tts?.configured ? ' Using Google Cloud voices.' : ''}
+          </p>
         </div>
-        {voices.length ? (
+
+        {tts?.configured ? (
           <div className="flex flex-wrap items-center gap-2">
             <select
-              value={voiceName}
-              onChange={(e) => { setVoiceNameState(e.target.value); setVoiceName(e.target.value); }}
+              value={cloudVoice}
+              onChange={(e) => { setCloudVoiceState(e.target.value); setCloudVoice(e.target.value); }}
               className="cd-input min-w-0 flex-1 !py-2"
             >
-              <option value="">Auto (best available)</option>
-              {usableVoices(voices).map((v) => (
-                <option key={v.name} value={v.name}>{v.name}</option>
-              ))}
+              <option value="">Default (US · Warm)</option>
+              {(tts.voices || []).map((v) => (<option key={v.id} value={v.id}>{v.label}</option>))}
             </select>
             <button onClick={() => speak('Hi, I’m Commons. This is how I sound.')} className="cd-btn cd-btn--secondary shrink-0">Test</button>
           </div>
+        ) : voices.length ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={voiceName}
+                onChange={(e) => { setVoiceNameState(e.target.value); setVoiceName(e.target.value); }}
+                className="cd-input min-w-0 flex-1 !py-2"
+              >
+                <option value="">Auto (best available)</option>
+                {usableVoices(voices).map((v) => (<option key={v.name} value={v.name}>{v.name}</option>))}
+              </select>
+              <button onClick={() => speak('Hi, I’m Commons. This is how I sound.')} className="cd-btn cd-btn--secondary shrink-0">Test</button>
+            </div>
+            <p className="text-xs text-text-3">These are your device's built-in voices. Add `GOOGLE_TTS_API_KEY` for lifelike Google Cloud voices.</p>
+          </>
         ) : (
           <p className="text-sm text-text-2">No speech voices available on this device.</p>
         )}
-        <p className="text-xs text-text-3">Tip: on Windows you can add nicer “Natural” voices in Settings → Time &amp; language → Speech.</p>
       </section>
 
       <button onClick={signOut} className="cd-btn cd-btn--ghost self-start">Sign out</button>
