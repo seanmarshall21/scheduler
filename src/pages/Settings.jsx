@@ -8,7 +8,7 @@ import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
 import { onVoicesReady, speak, usableVoices, ttsStatus, getVoiceSel, setVoiceSel } from '../lib/speech';
-import { getVoicePrefs, setVoicePref, START_OPTIONS, PAUSE_OPTIONS, keyLabel } from '../lib/voicePrefs';
+import { getVoicePrefs, setVoicePref, START_OPTIONS, PAUSE_OPTIONS, BARGE_OPTIONS, keyLabel } from '../lib/voicePrefs';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -406,27 +406,48 @@ export default function Settings() {
             ))}
           </div>
           {vp.startMode === 'listen' && (
-            <label className="flex items-center justify-between gap-3 text-sm text-text">
-              <span>
-                Pause before replying
-                <span className="block text-xs text-text-2">How long to wait after you stop talking.</span>
-              </span>
-              <select value={vp.pauseMs} onChange={(e) => updVp('pauseMs', Number(e.target.value))} className="cd-input shrink-0 !py-2">
-                {PAUSE_OPTIONS.map((o) => (<option key={o.ms} value={o.ms}>{o.label}</option>))}
-              </select>
-            </label>
+            <>
+              <label className="flex items-center justify-between gap-3 text-sm text-text">
+                <span className="min-w-0 flex-1">
+                  Pause before replying
+                  <span className="block text-xs text-text-2">How long to wait after you stop talking.</span>
+                </span>
+                <select value={vp.pauseMs} onChange={(e) => updVp('pauseMs', Number(e.target.value))} className="cd-input !w-auto shrink-0 !py-2">
+                  {PAUSE_OPTIONS.map((o) => (<option key={o.ms} value={o.ms}>{o.label}</option>))}
+                </select>
+              </label>
+              <div>
+                <p className="text-sm text-text">
+                  Interrupt while it’s talking
+                  <span className="block text-xs text-text-2">Talk over a reply to cut it off. Turn down if it stops itself too easily.</span>
+                </p>
+                <div className="mt-2 flex gap-2">
+                  {BARGE_OPTIONS.map((o) => (
+                    <button
+                      key={o.val}
+                      onClick={() => updVp('bargeIn', o.val)}
+                      title={o.hint}
+                      className={`flex-1 rounded-btn border px-2 py-1.5 text-sm transition-colors ${vp.bargeIn === o.val ? 'border-[#e08a3c] bg-surface-1 font-semibold text-text' : 'border-surface-3 text-text-2 hover:bg-surface-1'}`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
-          {vp.startMode === 'hold' && (
-            <div className="flex items-center justify-between gap-3 text-sm text-text">
-              <span>
-                Push-to-talk key
-                <span className="block text-xs text-text-2">Hold this key (or the mic) to talk; tap it to interrupt a reply.</span>
-              </span>
-              <button onClick={() => setCapturing(true)} className="cd-btn cd-btn--secondary min-w-[110px] shrink-0">
-                {capturing ? 'Press a key…' : vp.pttKeyLabel}
-              </button>
-            </div>
-          )}
+
+          {/* PTT key — works in Listening (interrupt + talk over) and Push-to-talk (talk) */}
+          <div className="flex items-center justify-between gap-3 text-sm text-text">
+            <span className="min-w-0 flex-1">
+              Push-to-talk key
+              <span className="block text-xs text-text-2">Hold this key (or the mic) to talk; tap to interrupt a reply. Works in Listening too.</span>
+            </span>
+            <button onClick={() => setCapturing(true)} className="cd-btn cd-btn--secondary min-w-[110px] shrink-0">
+              {capturing ? 'Press a key…' : vp.pttKeyLabel}
+            </button>
+          </div>
+
           {vp.startMode === 'text' && (
             <p className="text-xs text-text-3">The assistant opens to the keyboard; tap the mic anytime to switch to voice.</p>
           )}

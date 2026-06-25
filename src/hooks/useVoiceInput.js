@@ -8,7 +8,7 @@ const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.
 // `speakingRef` (a ref the caller flips true while TTS plays) drives barge-in:
 // while the assistant is talking we discard any picked-up audio (echo) and fire
 // onSpeechStart so the caller can stop the reply and let the user take over.
-export function useVoiceInput({ mode = 'auto', pauseMs = 1200, speakingRef, onFinal, onSpeechStart }) {
+export function useVoiceInput({ mode = 'auto', pauseMs = 1200, bargeIn = 'relaxed', speakingRef, onFinal, onSpeechStart }) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
   const recRef = useRef(null);
@@ -23,6 +23,8 @@ export function useVoiceInput({ mode = 'auto', pauseMs = 1200, speakingRef, onFi
   modeRef.current = mode;
   const pauseR = useRef(pauseMs);
   pauseR.current = pauseMs;
+  const bargeR = useRef(bargeIn);
+  bargeR.current = bargeIn;
 
   const clearSilence = () => { if (silenceRef.current) { clearTimeout(silenceRef.current); silenceRef.current = null; } };
 
@@ -43,12 +45,15 @@ export function useVoiceInput({ mode = 'auto', pauseMs = 1200, speakingRef, onFi
     rec.continuous = true;
     rec.interimResults = true;
     rec.onresult = (e) => {
-      // Barge-in: if the assistant is mid-sentence, treat any speech as an
-      // interruption, drop the echo captured so far, and let the caller stop TTS.
+      // Barge-in: if the assistant is mid-sentence, talking over it cuts it off.
+      // Sensitivity gates how much speech is needed (so the kiosk's own voice
+      // through the speakers doesn't keep interrupting it).
       if (speakingRef?.current) {
+        if (bargeR.current === 'off') return; // only the mic/key interrupt
         let any = '';
         for (let i = e.resultIndex; i < e.results.length; i++) any += e.results[i][0].transcript;
-        if (any.trim()) {
+        const minLen = bargeR.current === 'sensitive' ? 2 : 14;
+        if (any.trim().length >= minLen) {
           finalRef.current = '';
           interimRef.current = '';
           setInterim('');

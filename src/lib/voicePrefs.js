@@ -4,10 +4,19 @@ const K = {
   pttKey: 'commons.assistant.pttKey', // KeyboardEvent.code, e.g. 'Space'
   pttKeyLabel: 'commons.assistant.pttKeyLabel', // human label, e.g. 'Space'
   pauseMs: 'commons.assistant.pauseMs', // silence before auto-send (listen mode)
+  bargeIn: 'commons.assistant.bargeIn', // 'off' | 'relaxed' | 'sensitive' — interrupt while it talks
 };
 const ls = typeof localStorage !== 'undefined' ? localStorage : null;
 
-export const VOICE_DEFAULTS = { startMode: 'listen', pttKey: 'Space', pttKeyLabel: 'Space', pauseMs: 1200 };
+export const VOICE_DEFAULTS = { startMode: 'listen', pttKey: 'Space', pttKeyLabel: 'Space', pauseMs: 1200, bargeIn: 'relaxed' };
+
+// How eagerly talking over the assistant cuts it off. 'relaxed' needs a few
+// words (avoids the kiosk's own voice triggering it); 'sensitive' = any sound.
+export const BARGE_OPTIONS = [
+  { val: 'off', label: 'Off', hint: "Don't interrupt automatically (use the mic/key)." },
+  { val: 'relaxed', label: 'Relaxed', hint: 'Interrupt after a few words.' },
+  { val: 'sensitive', label: 'Sensitive', hint: 'Interrupt at the first sound.' },
+];
 
 // What the assistant does the moment you open it.
 export const START_OPTIONS = [
@@ -29,6 +38,7 @@ export function getVoicePrefs() {
     pttKey: ls?.getItem(K.pttKey) || VOICE_DEFAULTS.pttKey,
     pttKeyLabel: ls?.getItem(K.pttKeyLabel) || VOICE_DEFAULTS.pttKeyLabel,
     pauseMs: Number(ls?.getItem(K.pauseMs)) || VOICE_DEFAULTS.pauseMs,
+    bargeIn: ls?.getItem(K.bargeIn) || VOICE_DEFAULTS.bargeIn,
   };
 }
 

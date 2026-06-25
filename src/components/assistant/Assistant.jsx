@@ -112,6 +112,7 @@ export default function Assistant({ onClose, voiceFirst = false }) {
   const voice = useVoiceInput({
     mode: inputMode,
     pauseMs: prefs.pauseMs,
+    bargeIn: prefs.bargeIn,
     speakingRef,
     onFinal: (t) => send(t),
     onSpeechStart: () => { if (speakingRef.current) interrupt(); },
@@ -163,26 +164,28 @@ export default function Assistant({ onClose, voiceFirst = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Push-to-talk key (hold mode): hold the configured key to talk.
+  // Push-to-talk key — works in BOTH voice modes. In hold mode it captures while
+  // held and sends on release; in listening mode it interrupts a reply and makes
+  // sure the mic is live so you can talk over it.
   useEffect(() => {
-    if (mode !== 'voice' || inputMode !== 'hold') return undefined;
+    if (mode !== 'voice') return undefined;
     const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
     const down = (e) => {
       if (e.code !== prefs.pttKey || e.repeat || isTyping(e.target)) return;
       e.preventDefault();
       interrupt();
-      voice.start();
+      if (!voice.listening) voice.start();
     };
     const up = (e) => {
       if (e.code !== prefs.pttKey) return;
       e.preventDefault();
-      voice.stop(true);
+      if (inputMode === 'hold') voice.stop(true); // listening mode keeps listening
     };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, voice.listening]);
 
   // Cleanup on close.
   useEffect(() => () => { stopSpeaking(); }, []);
@@ -200,7 +203,7 @@ export default function Assistant({ onClose, voiceFirst = false }) {
     : { onClick: () => { if (speaking) { interrupt(); return; } if (voice.listening) voice.stop(); else voice.start(); } };
 
   const hint = speaking
-    ? (inputMode === 'hold' ? `Speaking… hold ${prefs.pttKeyLabel} or the mic to interrupt` : 'Speaking… tap to interrupt')
+    ? (inputMode === 'hold' ? `Speaking… hold ${prefs.pttKeyLabel} or the mic to interrupt` : `Speaking… tap or press ${prefs.pttKeyLabel} to interrupt`)
     : busy
       ? 'Thinking…'
       : voice.listening
