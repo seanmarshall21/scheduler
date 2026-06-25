@@ -1,7 +1,7 @@
 {
-  "name": "Commons — Family Hub",
+  "name": "Commons — Shared Hub",
   "short_name": "Commons",
-  "description": "The family calendar, tasks, and notes hub for the kitchen wall and your phone.",
+  "description": "A shared calendar, tasks, and notes hub for your home, crew, or team — on the kitchen wall and your phone.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

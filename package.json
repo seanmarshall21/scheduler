@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Commons — a family/home shared calendar, tasks, and notes hub for the kitchen wall + phones.",
+  "description": "Commons — a shared calendar, tasks, and notes hub for your home, crew, or team (kitchen wall + phones).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

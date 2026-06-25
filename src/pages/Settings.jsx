@@ -73,7 +73,7 @@ export default function Settings() {
           <div>
             <h2 className="text-base font-bold text-text">Open the door</h2>
             <p className="mt-1 text-sm text-text-2">
-              Share your Commons Key so family can join this home and share calendars.
+              Share your Commons Key so others can join this home and share calendars.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export default function Settings() {
 
       {/* Members */}
       <section className="cd-card flex flex-col gap-3">
-        <h2 className="text-base font-bold text-text">Family members</h2>
+        <h2 className="text-base font-bold text-text">Members</h2>
         <div className="flex flex-col gap-2">
           {members.map((m) => (
             <div key={m.id} className="flex items-center gap-3 rounded-btn border border-surface-3 p-2">
@@ -292,7 +292,7 @@ export default function Settings() {
         <div>
           <h2 className="text-base font-bold text-text">Work schedule</h2>
           <p className="mt-1 text-sm text-text-2">
-            Your CRFTD work blocks (scheduled ClickUp tasks) show on your lane of the family board.
+            Your CRFTD work blocks (scheduled ClickUp tasks) show on your lane of the shared board.
           </p>
         </div>
         {!work.configured ? (

@@ -1,6 +1,6 @@
-# Commons — Family Hub
+# Commons — Shared Hub
 
-A family/home shared calendar, tasks, and notes hub. Built to run on a
+A shared calendar, tasks, and notes hub for your home, crew, or team. Built to run on a
 wall-mounted kitchen **touchscreen** (always-on kiosk) and on each person's
 **phone**. Everyone sees each other's schedules inline, color-coded per person,
 so the household coordinates at a glance.

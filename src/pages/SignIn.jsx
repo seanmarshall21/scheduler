@@ -58,7 +58,7 @@ export default function SignIn() {
         <div className="mb-6 flex flex-col items-center text-center">
           <img src="/icons/icon.svg" alt="" className="h-14 w-auto" />
           <h1 className="mt-3 text-2xl font-bold text-text">Commons</h1>
-          <p className="mt-1 text-sm text-text-2">Your family's shared calendar, tasks &amp; notes.</p>
+          <p className="mt-1 text-sm text-text-2">Your shared calendar, tasks &amp; notes.</p>
         </div>
 
         <div className="cd-card flex flex-col gap-3">

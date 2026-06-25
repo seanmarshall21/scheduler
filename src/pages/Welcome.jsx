@@ -50,7 +50,7 @@ export default function Welcome() {
           <h1 className="text-2xl font-bold text-text">{mode === 'create' ? 'Set up your home' : 'Join a home'}</h1>
           <p className="mt-1 text-sm text-text-2">
             {mode === 'create'
-              ? "Name your household — you'll add family members next."
+              ? "Name your home — you'll add people next."
               : 'Enter the Commons Key someone shared with you.'}
           </p>
         </div>

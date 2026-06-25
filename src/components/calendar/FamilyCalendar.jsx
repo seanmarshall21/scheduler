@@ -329,7 +329,7 @@ export default function FamilyCalendar({
     <section className={`cd-card flex min-h-0 flex-col gap-3 ${className}`}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="leading-tight">
-          <h2 className="text-base font-bold text-text">Family calendar</h2>
+          <h2 className="text-base font-bold text-text">Shared calendar</h2>
           <div className="cd-mono-label mt-0.5">{rangeLabel}</div>
         </div>
         <div className="flex items-center gap-1.5">

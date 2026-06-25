@@ -19,7 +19,7 @@ const TOURS = {
     { selector: '[data-tour="home-clock"]', title: 'Today at a glance', body: 'The big clock and date — built to read across the kitchen. Everyone in the home shows up here.' },
     { selector: '[data-tour="home-agenda"]', title: 'Today’s agenda', body: 'Everything scheduled today, color-coded per person. Tap “open calendar” for the full board.' },
     { selector: '[data-tour="home-tasks"]', title: 'What’s due', body: 'Tasks due today (or what’s open). Tap “all” to manage them.' },
-    { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On the shared screen, tap here to switch which family member you are.' },
+    { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On the shared screen, tap here to switch which member you are.' },
   ],
   '/tasks': [
     { selector: '[data-tour="task-add"]', title: 'Add a task', body: 'Type a task, assign it to someone, and give it a due date.' },
@@ -36,14 +36,14 @@ const TOURS = {
     { selector: '[data-tour="cal-grid"]', title: 'The board', body: 'Everyone’s blocks and events, color-coded. Drag a block to move it; tap an event to edit or delete it.' },
   ],
   '/settings': [
-    { selector: '[data-tour="set-door"]', title: 'Open the door', body: 'Share your Commons Key so family can join this home and share calendars.' },
+    { selector: '[data-tour="set-door"]', title: 'Open the door', body: 'Share your Commons Key so others can join this home and share calendars.' },
     { selector: '[data-tour="set-calendars"]', title: 'Your calendars', body: 'Make in-app calendars for things that don’t belong in a work or email account.' },
     { selector: '[data-tour="set-google"]', title: 'Connect Google', body: 'Add each person’s Google account, then choose busy-only or which calendars appear.' },
   ],
 };
 const GENERIC = [
   { selector: '[data-tour="nav"]', title: 'Welcome to Commons', body: 'Move between Home, Calendar, Tasks, Notes, and Settings here. Tap the “?” on any page for a quick tour of it.' },
-  { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On a shared screen, tap here to switch which family member you are.' },
+  { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On a shared screen, tap here to switch which member you are.' },
 ];
 
 export default function AppShell() {
