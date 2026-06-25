@@ -156,6 +156,21 @@ export function useGoogleCalendar() {
     [load]
   );
 
+  // Mirror a Commons event into a connected Google calendar. Returns the new
+  // Google event id.
+  const createGoogleEvent = useCallback(async ({ connId, calId, summary, start, end, recurrence }) => {
+    const { gid } = await callFn('google-calendar-event-write', {
+      action: 'create',
+      connId,
+      calId,
+      summary,
+      start,
+      end,
+      recurrence,
+    });
+    return gid;
+  }, []);
+
   return {
     configured,
     loading,
@@ -168,6 +183,7 @@ export function useGoogleCalendar() {
     setBusyOnly,
     setCalendarEnabled,
     disconnect,
+    createGoogleEvent,
     reload: load,
   };
 }

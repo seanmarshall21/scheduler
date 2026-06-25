@@ -7,8 +7,9 @@ import { createClient } from '@supabase/supabase-js';
 // signed-in user, so RLS scopes the connection to the caller's household.
 // Requires the read/write calendar scope (calendar.events) on the connection.
 //
-// Body: { connId, calId, gid, action: 'delete' | 'patch', start?, end? }
-//   - 'patch' moves the event: start/end are ISO datetimes.
+// Body: { connId, calId, action: 'create'|'patch'|'delete', gid?, start?, end?, summary?, recurrence? }
+//   - 'create' adds an event to the calendar (Commons → Google mirror).
+//   - 'patch' moves/edits; 'delete' removes. gid required for patch/delete.
 // Env: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID,
 // GOOGLE_CLIENT_SECRET.
 
@@ -76,9 +77,11 @@ export const handler = async (event) => {
   } catch {
     return json(400, { error: 'Invalid JSON body.' });
   }
-  const { connId, calId, gid, seriesId, scope, action, start, end, summary } = payload;
-  if (!connId || !calId || !gid) return json(400, { error: 'connId, calId and gid are required.' });
-  if (action !== 'delete' && action !== 'patch') return json(400, { error: 'action must be delete or patch.' });
+  const { connId, calId, gid, seriesId, scope, action, start, end, summary, recurrence } = payload;
+  if (!connId || !calId) return json(400, { error: 'connId and calId are required.' });
+  if (!['create', 'patch', 'delete'].includes(action)) return json(400, { error: 'action must be create, patch or delete.' });
+  if (action !== 'create' && !gid) return json(400, { error: 'gid is required for patch/delete.' });
+  if (action === 'create' && (!summary || !start || !end)) return json(400, { error: 'create needs summary, start and end.' });
   // scope 'series' targets the whole recurring event (the master); default is
   // just this occurrence.
   const targetId = scope === 'series' && seriesId ? seriesId : gid;
@@ -94,8 +97,23 @@ export const handler = async (event) => {
 
   try {
     const accessToken = await freshAccessToken(supabase, conn);
-    const base = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(targetId)}`;
     const headers = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+    const calBase = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
+
+    if (action === 'create') {
+      const body = { summary: summary || 'Event', start: { dateTime: start }, end: { dateTime: end } };
+      if (Array.isArray(recurrence) && recurrence.length) body.recurrence = recurrence;
+      const r = await fetch(calBase, { method: 'POST', headers, body: JSON.stringify(body) });
+      if (!r.ok) {
+        const t = await r.text();
+        if (r.status === 403) return json(403, { error: 'No write access — reconnect this calendar to grant edit permission.' });
+        return json(502, { error: `Create failed (${r.status}): ${t.slice(0, 200)}` });
+      }
+      const out = await r.json();
+      return json(200, { ok: true, action: 'create', gid: out.id });
+    }
+
+    const base = `${calBase}/${encodeURIComponent(targetId)}`;
 
     if (action === 'delete') {
       const r = await fetch(base, { method: 'DELETE', headers });

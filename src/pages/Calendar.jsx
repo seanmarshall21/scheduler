@@ -18,6 +18,15 @@ const todayISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// Google recurrence (RRULE) from our simple repeat field.
+const rruleFor = (repeat, until) => {
+  const freq = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY', yearly: 'YEARLY' }[repeat];
+  if (!freq) return undefined;
+  let rule = `RRULE:FREQ=${freq}`;
+  if (until) rule += `;UNTIL=${until.replace(/-/g, '')}T235959Z`;
+  return [rule];
+};
+
 function AddBlockSheet({ seed, members, defaultMemberId, onClose, onSave }) {
   const [title, setTitle] = useState('');
   const [memberId, setMemberId] = useState(seed.member_id || defaultMemberId || members[0]?.id || null);
@@ -81,7 +90,7 @@ function AddBlockSheet({ seed, members, defaultMemberId, onClose, onSave }) {
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
-function AddEventSheet({ event, calendars, members, defaultMemberId, addCalendar, addEvent, updateEvent, removeEvent, onClose }) {
+function AddEventSheet({ event, calendars, members, defaultMemberId, gcalAccounts, addCalendar, addEvent, updateEvent, removeEvent, onPush, onClose }) {
   const editing = Boolean(event);
   const seedStart = editing ? new Date(event.starts_at) : null;
   const seedMinutes = editing && event.ends_at
@@ -104,6 +113,29 @@ function AddEventSheet({ event, calendars, members, defaultMemberId, addCalendar
 
   const creatingCal = calendarId === '__new__';
   const lengthOptions = [...new Set([15, 30, 45, 60, 90, 120, 180, 240, minutes])].sort((a, b) => a - b);
+
+  // Push-to-Google (edit mode): pick a connected account + calendar to mirror to.
+  const pushTargets = (gcalAccounts || []).flatMap((a) =>
+    (a.calendars || []).map((c) => ({ value: `${a.connId}::${c.id}`, label: `${a.email} · ${c.name || c.id}` }))
+  );
+  const [pushTarget, setPushTarget] = useState(pushTargets[0]?.value || '');
+  const [pushed, setPushed] = useState(Boolean(event?.google_event_id));
+  const [pushing, setPushing] = useState(false);
+
+  const doPush = async () => {
+    if (!pushTarget || !onPush) return;
+    const [connId, calId] = pushTarget.split('::');
+    setPushing(true);
+    setErr(null);
+    try {
+      await onPush(event, connId, calId);
+      setPushed(true);
+    } catch (e) {
+      setErr(e.message || 'Could not add to Google.');
+    } finally {
+      setPushing(false);
+    }
+  };
 
   const save = async () => {
     if (!title.trim() || !memberId) return;
@@ -214,6 +246,24 @@ function AddEventSheet({ event, calendars, members, defaultMemberId, addCalendar
 
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" rows={2} className="cd-input" />
 
+          {editing && pushTargets.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-btn border border-surface-2 p-2">
+              <span className="cd-mono-label">Mirror to Google</span>
+              {pushed ? (
+                <p className="text-sm text-text-2">✓ Added to a Google calendar.</p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select value={pushTarget} onChange={(e) => setPushTarget(e.target.value)} className="cd-input min-w-0 flex-1 !py-2">
+                    {pushTargets.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}
+                  </select>
+                  <button onClick={doPush} disabled={pushing} className="cd-btn cd-btn--secondary shrink-0">
+                    {pushing ? 'Adding…' : 'Add to Google'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {err && <p className="text-xs text-red-600">{err}</p>}
           <div className="flex items-center gap-2">
             <button onClick={save} disabled={busy || !title.trim() || (creatingCal && !newCalName.trim())} className="cd-btn cd-btn--accent cd-btn--kiosk flex-1">
@@ -234,7 +284,7 @@ function AddEventSheet({ event, calendars, members, defaultMemberId, addCalendar
 export default function Calendar() {
   const { household, members, activeMemberId } = useApp();
   const { blocks, addBlock, updateBlock, removeBlock } = useScheduleBlocks(household?.id);
-  const { events: gcalEvents } = useGoogleCalendar();
+  const { events: gcalEvents, accounts: gcalAccounts, createGoogleEvent } = useGoogleCalendar();
   const { events: workEvents } = useWorkSchedule();
   const { calendars, addCalendar } = useCalendars(household?.id);
   const { events: appRaw, addEvent, updateEvent, removeEvent } = useEvents(household?.id);
@@ -258,6 +308,19 @@ export default function Calendar() {
     if (occ?.source !== 'app') return;
     const raw = appRaw.find((e) => e.id === occ.eventId);
     if (raw) setEditEvent(raw);
+  };
+
+  // Mirror a saved app-native event into a connected Google calendar.
+  const pushToGoogle = async (eventRow, connId, calId) => {
+    const gid = await createGoogleEvent({
+      connId,
+      calId,
+      summary: eventRow.title,
+      start: eventRow.starts_at,
+      end: eventRow.ends_at,
+      recurrence: rruleFor(eventRow.repeat, eventRow.repeat_until),
+    });
+    await updateEvent(eventRow.id, { google_connection_id: connId, google_event_id: gid });
   };
 
   const visibleMemberIds = useMemo(
@@ -322,10 +385,12 @@ export default function Calendar() {
           calendars={calendars}
           members={members}
           defaultMemberId={activeMemberId}
+          gcalAccounts={gcalAccounts}
           addCalendar={addCalendar}
           addEvent={addEvent}
           updateEvent={updateEvent}
           removeEvent={removeEvent}
+          onPush={pushToGoogle}
           onClose={() => { setShowEvent(false); setEditEvent(null); }}
         />
       )}
