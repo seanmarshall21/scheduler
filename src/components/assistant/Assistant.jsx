@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Mic, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { speak as speakText } from '../../lib/speech';
 import { useApp } from '../../context/AppContext';
 import { useScheduleBlocks } from '../../hooks/useScheduleBlocks';
 import { useGoogleCalendar } from '../../hooks/useGoogleCalendar';
@@ -97,7 +98,7 @@ export default function Assistant({ onClose }) {
         refetchNotes?.();
         refetchBlocks?.();
       }
-      if (speak && reply && window.speechSynthesis) window.speechSynthesis.speak(new SpeechSynthesisUtterance(reply));
+      if (speak && reply) speakText(reply);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'I couldn’t reach the assistant.' }]);
     } finally {

@@ -7,6 +7,7 @@ import { useMembers } from '../hooks/useMembers';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
+import { onVoicesReady, getVoiceName, setVoiceName, speak } from '../lib/speech';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -22,6 +23,8 @@ export default function Settings() {
   const work = useWorkSchedule();
   const cal = useCalendars(household?.id);
   const [newCalName, setNewCalName] = useState('');
+  const [voices, setVoices] = useState([]);
+  const [voiceName, setVoiceNameState] = useState(getVoiceName());
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectMemberId, setConnectMemberId] = useState(activeMemberId || '');
   const [expandedConn, setExpandedConn] = useState(null);
@@ -42,6 +45,10 @@ export default function Settings() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => {
+    onVoicesReady(setVoices);
+  }, []);
 
   const add = (e) => {
     e.preventDefault();
@@ -315,6 +322,32 @@ export default function Settings() {
             />
           </label>
         )}
+      </section>
+
+      {/* Assistant voice */}
+      <section className="cd-card flex flex-col gap-3">
+        <div>
+          <h2 className="text-base font-bold text-text">Assistant voice</h2>
+          <p className="mt-1 text-sm text-text-2">The voice Commons uses when it reads replies aloud.</p>
+        </div>
+        {voices.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={voiceName}
+              onChange={(e) => { setVoiceNameState(e.target.value); setVoiceName(e.target.value); }}
+              className="cd-input min-w-0 flex-1 !py-2"
+            >
+              <option value="">Auto (best available)</option>
+              {voices.filter((v) => /^en/i.test(v.lang)).map((v) => (
+                <option key={v.name} value={v.name}>{v.name}</option>
+              ))}
+            </select>
+            <button onClick={() => speak('Hi, I’m Commons. This is how I sound.')} className="cd-btn cd-btn--secondary shrink-0">Test</button>
+          </div>
+        ) : (
+          <p className="text-sm text-text-2">No speech voices available on this device.</p>
+        )}
+        <p className="text-xs text-text-3">Tip: on Windows you can add nicer “Natural” voices in Settings → Time &amp; language → Speech.</p>
       </section>
 
       <button onClick={signOut} className="cd-btn cd-btn--ghost self-start">Sign out</button>
