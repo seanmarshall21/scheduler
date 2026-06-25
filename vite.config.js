@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Installable PWA — the kitchen display runs this fullscreen ("Add to Home
 // Screen" / kiosk), and each phone installs it too. registerType 'prompt'
 // keeps a new service worker waiting until the user opts in (see
-// useServiceWorkerUpdate); the manifest lives in public/manifest.json.
+// components/UpdateBanner.jsx); the manifest lives in public/manifest.json.
 export default defineConfig({
   plugins: [
     react(),

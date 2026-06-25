@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import AppShell from './components/layout/AppShell';
+import UpdateBanner from './components/UpdateBanner';
 
 import SignIn from './pages/SignIn';
 import Welcome from './pages/Welcome';
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+        <UpdateBanner />
       </AppProvider>
     </AuthProvider>
   );
