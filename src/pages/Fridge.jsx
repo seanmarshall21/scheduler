@@ -58,6 +58,11 @@ export default function Fridge() {
   }, [loading, initStrokes, initItems, ready]);
 
   // ── Drawing layer ──────────────────────────────────────────────────────────
+  // Read live strokes through a ref so the ResizeObserver / redraw callbacks
+  // never close over a stale array (which is what blanked the canvas).
+  const strokesRef = useRef([]);
+  strokesRef.current = strokes;
+
   const drawStroke = (ctx, s, scale) => {
     if (!s.p || s.p.length < 1) return;
     ctx.beginPath();
@@ -71,27 +76,33 @@ export default function Fridge() {
     });
     ctx.stroke();
   };
-  const redraw = () => {
+  const redrawAll = () => {
     const c = canvasRef.current;
-    if (!c) return;
+    if (!c || !c.width) return;
     const ctx = c.getContext('2d');
     ctx.clearRect(0, 0, c.width, c.height);
     const scale = c.width / VW;
-    for (const s of strokes) drawStroke(ctx, s, scale);
+    for (const s of strokesRef.current) drawStroke(ctx, s, scale);
+    if (drawing.current) drawStroke(ctx, drawing.current, scale); // keep the in-progress line
   };
   const sizeCanvas = () => {
     const c = canvasRef.current;
     if (!c) return;
     const r = c.getBoundingClientRect();
-    c.width = Math.round(r.width);
-    c.height = Math.round(r.height);
-    redraw();
+    if (!r.width || !r.height) return; // ignore transient 0-size layouts
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.round(r.width * dpr);
+    const h = Math.round(r.height * dpr);
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    redrawAll();
   };
-  useEffect(() => { redraw(); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { redrawAll(); }, [strokes]);
   useEffect(() => {
     sizeCanvas();
-    window.addEventListener('resize', sizeCanvas);
-    return () => window.removeEventListener('resize', sizeCanvas);
+    const ro = new ResizeObserver(() => sizeCanvas());
+    if (canvasRef.current) ro.observe(canvasRef.current);
+    return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -119,13 +130,8 @@ export default function Fridge() {
   };
   const onPenMove = (e) => {
     if (mode !== 'draw' || !drawing.current) return;
-    const p = clampV(...toV(e));
-    const prev = drawing.current.p[drawing.current.p.length - 1];
-    drawing.current.p.push(p);
-    const c = canvasRef.current; const ctx = c.getContext('2d'); const scale = c.width / VW;
-    ctx.strokeStyle = drawing.current.c; ctx.lineWidth = drawing.current.w * scale;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(prev[0] * scale, prev[1] * scale); ctx.lineTo(p[0] * scale, p[1] * scale); ctx.stroke();
+    drawing.current.p.push(clampV(...toV(e)));
+    redrawAll();
     e.preventDefault();
   };
   const onPenUp = () => {
@@ -236,7 +242,7 @@ export default function Fridge() {
             onPointerUp={onPenUp}
             onPointerCancel={onPenUp}
             className="absolute inset-0 h-full w-full"
-            style={{ pointerEvents: mode === 'draw' ? 'auto' : 'none' }}
+            style={{ pointerEvents: mode === 'draw' ? 'auto' : 'none', touchAction: 'none' }}
           />
 
           {items.map((it) => {
@@ -255,6 +261,7 @@ export default function Fridge() {
                   left: pct(it.x, VW), top: pct(it.y, VH), width: pct(it.w, VW), height: pct(it.h, VH),
                   transform: `rotate(${it.rot || 0}deg)`,
                   pointerEvents: mode === 'move' ? 'auto' : 'none',
+                  touchAction: 'none',
                   borderRadius: 10,
                 }}
               >
