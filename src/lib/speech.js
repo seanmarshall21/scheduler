@@ -1,10 +1,10 @@
 import { supabase } from './supabase';
 
-// Spoken replies for the assistant. Prefers Google Cloud TTS (lifelike) when the
-// server has it configured; otherwise falls back to the browser's built-in
-// voices (preferring Google, dropping the robotic local Microsoft ones).
-const VOICE_KEY = 'commons.assistant.voice'; // browser voice name
-const CLOUD_VOICE_KEY = 'commons.assistant.cloudVoice'; // Google Cloud voice id
+// Spoken replies for the assistant. Two voice sources:
+//   • Google Cloud TTS (lifelike) — when the server has GOOGLE_TTS_API_KEY.
+//   • The browser's built-in voices (device-dependent; Google ones preferred).
+// The chosen voice is stored as "cloud:<id>" or "browser:<name>" (empty = auto).
+const SEL_KEY = 'commons.assistant.voiceSel';
 
 // ── Browser voices ──────────────────────────────────────────────────────────
 export function listVoices() {
@@ -22,13 +22,6 @@ export function preferredVoice(voices) {
   return google || nice || list.find((v) => v.default) || list[0] || voices.find((v) => /^en/i.test(v.lang)) || voices[0] || null;
 }
 
-export function getVoiceName() {
-  return (typeof localStorage !== 'undefined' && localStorage.getItem(VOICE_KEY)) || '';
-}
-export function setVoiceName(name) {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(VOICE_KEY, name || '');
-}
-
 export function onVoicesReady(cb) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   const v = listVoices();
@@ -36,12 +29,20 @@ export function onVoicesReady(cb) {
   window.speechSynthesis.addEventListener('voiceschanged', () => cb(listVoices()), { once: true });
 }
 
-function speakBrowser(text) {
+// ── Voice selection (unified across both sources) ─────────────────────────────
+export function getVoiceSel() {
+  return (typeof localStorage !== 'undefined' && localStorage.getItem(SEL_KEY)) || '';
+}
+export function setVoiceSel(val) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(SEL_KEY, val || '');
+}
+
+function speakBrowser(text, name) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !window.speechSynthesis || !text) { resolve(); return; }
     const u = new SpeechSynthesisUtterance(text);
     const voices = listVoices();
-    const chosen = voices.find((v) => v.name === getVoiceName()) || preferredVoice(voices);
+    const chosen = (name && voices.find((v) => v.name === name)) || preferredVoice(voices);
     if (chosen) u.voice = chosen;
     u.onend = () => resolve();
     u.onerror = () => resolve();
@@ -51,7 +52,7 @@ function speakBrowser(text) {
 }
 
 // ── Cloud (Google) TTS ──────────────────────────────────────────────────────
-let ttsConfig = null; // { configured, voices }
+let ttsConfig = null; // { configured, voices: [{id,label,group}] }
 let audioEl = null;
 
 async function authToken() {
@@ -71,19 +72,12 @@ export async function ttsStatus() {
   return ttsConfig;
 }
 
-export function getCloudVoice() {
-  return (typeof localStorage !== 'undefined' && localStorage.getItem(CLOUD_VOICE_KEY)) || '';
-}
-export function setCloudVoice(id) {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(CLOUD_VOICE_KEY, id || '');
-}
-
-async function speakCloud(text) {
+async function speakCloud(text, id) {
   const token = await authToken();
   const res = await fetch('/.netlify/functions/tts', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice: getCloudVoice() || undefined }),
+    body: JSON.stringify({ text, voice: id || undefined }),
   });
   const data = await res.json();
   if (!data.audio) throw new Error('no audio');
@@ -99,17 +93,19 @@ export function stopSpeaking() {
   if (audioEl) { try { audioEl.pause(); audioEl.currentTime = 0; } catch { /* noop */ } }
 }
 
-// Speak `text` — Google Cloud TTS if available, else the browser voice.
+// Speak `text` using the selected voice, with sensible fallbacks.
 export async function speak(text) {
   if (!text) return;
+  const sel = getVoiceSel();
   const cfg = await ttsStatus();
-  if (cfg?.configured) {
-    try {
-      await speakCloud(text);
-      return;
-    } catch {
-      /* fall through to browser */
-    }
+
+  if (sel.startsWith('browser:')) return speakBrowser(text, sel.slice(8));
+  if (sel.startsWith('cloud:') && cfg?.configured) {
+    try { return await speakCloud(text, sel.slice(6)); } catch { /* fall through */ }
   }
-  speakBrowser(text);
+  // Auto: prefer cloud when available, else the browser voice.
+  if (cfg?.configured) {
+    try { return await speakCloud(text); } catch { /* fall through */ }
+  }
+  return speakBrowser(text);
 }
