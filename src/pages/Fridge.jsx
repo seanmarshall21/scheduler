@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronLeft, ImagePlus, Pencil, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
+import { BringToFront, Camera, ChevronLeft, ImagePlus, Pencil, SendToBack, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useWhiteboard } from '../hooks/useWhiteboard';
 
@@ -140,13 +140,17 @@ export default function Fridge() {
     e.preventDefault();
   };
   const onPenUp = () => {
-    if (drawing.current && drawing.current.p.length > 1) setStrokes((s) => [...s, drawing.current]);
+    const stroke = drawing.current; // capture before clearing — the state updater runs later
     drawing.current = null;
+    if (stroke && stroke.p.length > 1) setStrokes((s) => [...s, stroke]);
   };
 
   // ── Items ───────────────────────────────────────────────────────────────────
   const updateItem = (id, patch) => setItems((arr) => arr.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   const removeItem = (id) => { setItems((arr) => arr.filter((it) => it.id !== id)); setSelectedId(null); setEditingId(null); };
+  // Layer order = array order (later paints on top); drawings always sit behind.
+  const bringToFront = (id) => setItems((arr) => { const it = arr.find((x) => x.id === id); return it ? [...arr.filter((x) => x.id !== id), it] : arr; });
+  const sendToBack = (id) => setItems((arr) => { const it = arr.find((x) => x.id === id); return it ? [it, ...arr.filter((x) => x.id !== id)] : arr; });
 
   const addNote = () => {
     const id = uid();
@@ -291,6 +295,18 @@ export default function Fridge() {
 
                 {sel && mode === 'move' && (
                   <>
+                    <div className="absolute -left-2 -top-2 flex gap-1">
+                      <button
+                        onPointerDown={(e) => { e.stopPropagation(); bringToFront(it.id); }}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-text text-white shadow"
+                        aria-label="Bring to front"
+                      ><BringToFront className="h-3.5 w-3.5" /></button>
+                      <button
+                        onPointerDown={(e) => { e.stopPropagation(); sendToBack(it.id); }}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-text shadow ring-1 ring-surface-3"
+                        aria-label="Send to back"
+                      ><SendToBack className="h-3.5 w-3.5" /></button>
+                    </div>
                     <button
                       onPointerDown={(e) => { e.stopPropagation(); removeItem(it.id); }}
                       className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-text text-white shadow"
