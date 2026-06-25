@@ -51,11 +51,13 @@ export default function Assistant({ onClose, voiceFirst = false }) {
   const { notes, refetch: refetchNotes } = useNotes(household?.id);
 
   const prefs = useRef(getVoicePrefs()).current;
+  const inputMode = prefs.startMode === 'hold' ? 'hold' : 'auto';
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [speak, setSpeak] = useState(voiceFirst);
-  const [mode, setMode] = useState(voiceFirst && micAvailable ? 'voice' : 'text');
+  const [mode, setMode] = useState(voiceFirst && micAvailable && prefs.startMode !== 'text' ? 'voice' : 'text');
+  const [speaking, setSpeaking] = useState(false);
   const modeRef = useRef(mode);
   const greeted = useRef(false);
   const speakingRef = useRef(false);
@@ -101,15 +103,18 @@ export default function Assistant({ onClose, voiceFirst = false }) {
   // Speak a reply while flagging TTS so the mic can suppress echo / allow barge-in.
   const speakReply = async (text) => {
     speakingRef.current = true;
-    try { await speakText(text); } finally { speakingRef.current = false; }
+    setSpeaking(true);
+    try { await speakText(text); } finally { speakingRef.current = false; setSpeaking(false); }
   };
+  // Stop the assistant mid-reply (the mic / key doubles as an interrupter).
+  const interrupt = () => { stopSpeaking(); speakingRef.current = false; setSpeaking(false); };
 
   const voice = useVoiceInput({
-    mode: prefs.inputMode,
+    mode: inputMode,
     pauseMs: prefs.pauseMs,
     speakingRef,
     onFinal: (t) => send(t),
-    onSpeechStart: () => { if (speakingRef.current) { stopSpeaking(); speakingRef.current = false; } },
+    onSpeechStart: () => { if (speakingRef.current) interrupt(); },
   });
 
   const send = async (text) => {
@@ -153,20 +158,19 @@ export default function Assistant({ onClose, voiceFirst = false }) {
       const g = greeting();
       setMessages([{ role: 'assistant', content: g }]);
       await speakReply(g);
-      if (modeRef.current === 'voice' && prefs.inputMode === 'auto') voice.start();
+      if (modeRef.current === 'voice' && inputMode === 'auto') voice.start();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Push-to-talk key (hold mode): hold the configured key to talk.
   useEffect(() => {
-    if (mode !== 'voice' || prefs.inputMode !== 'hold') return undefined;
+    if (mode !== 'voice' || inputMode !== 'hold') return undefined;
     const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
     const down = (e) => {
       if (e.code !== prefs.pttKey || e.repeat || isTyping(e.target)) return;
       e.preventDefault();
-      stopSpeaking();
-      speakingRef.current = false;
+      interrupt();
       voice.start();
     };
     const up = (e) => {
@@ -183,23 +187,25 @@ export default function Assistant({ onClose, voiceFirst = false }) {
   // Cleanup on close.
   useEffect(() => () => { stopSpeaking(); }, []);
 
-  const switchToText = () => { voice.stop(); stopSpeaking(); setMode('text'); };
-  const switchToVoice = () => { setMode('voice'); if (prefs.inputMode === 'auto') voice.start(); };
+  const switchToText = () => { voice.stop(); interrupt(); setMode('text'); };
+  const switchToVoice = () => { setMode('voice'); if (inputMode === 'auto') voice.start(); };
 
-  const holdProps = prefs.inputMode === 'hold'
+  const holdProps = inputMode === 'hold'
     ? {
-        onPointerDown: () => { stopSpeaking(); speakingRef.current = false; voice.start(); },
+        onPointerDown: () => { interrupt(); voice.start(); },
         onPointerUp: () => voice.stop(true),
         onPointerLeave: () => voice.listening && voice.stop(true),
         onPointerCancel: () => voice.stop(true),
       }
-    : { onClick: () => (voice.listening ? voice.stop() : voice.start()) };
+    : { onClick: () => { if (speaking) { interrupt(); return; } if (voice.listening) voice.stop(); else voice.start(); } };
 
-  const hint = busy
-    ? 'Thinking…'
-    : voice.listening
-      ? (prefs.inputMode === 'hold' ? 'Listening… release to send' : 'Listening… tap to stop')
-      : (prefs.inputMode === 'hold' ? `Hold the mic or ${prefs.pttKeyLabel} to talk` : 'Tap to talk');
+  const hint = speaking
+    ? (inputMode === 'hold' ? `Speaking… hold ${prefs.pttKeyLabel} or the mic to interrupt` : 'Speaking… tap to interrupt')
+    : busy
+      ? 'Thinking…'
+      : voice.listening
+        ? (inputMode === 'hold' ? 'Listening… release to send' : 'Listening… tap to stop')
+        : (inputMode === 'hold' ? `Hold the mic or ${prefs.pttKeyLabel} to talk` : 'Tap to talk');
 
   const suggestions = ['Anything on Thursday?', "What's due today?", 'Add milk to the groceries'];
 

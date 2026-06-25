@@ -93,8 +93,22 @@ export function stopSpeaking() {
   if (audioEl) { try { audioEl.pause(); audioEl.currentTime = 0; } catch { /* noop */ } }
 }
 
+// Strip Markdown / code so the assistant never reads symbols aloud.
+export function plainText(text) {
+  return String(text || '')
+    .replace(/```[\s\S]*?```/g, ' ') // code fences
+    .replace(/`([^`]+)`/g, '$1') // inline code
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // links → text
+    .replace(/[*_~#>]/g, '') // emphasis / headings / quotes
+    .replace(/^\s*[-+]\s+/gm, '') // bullet markers
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Speak `text` using the selected voice, with sensible fallbacks.
 export async function speak(text) {
+  text = plainText(text);
   if (!text) return;
   const sel = getVoiceSel();
   const cfg = await ttsStatus();

@@ -8,7 +8,7 @@ import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
 import { onVoicesReady, speak, usableVoices, ttsStatus, getVoiceSel, setVoiceSel } from '../lib/speech';
-import { getVoicePrefs, setVoicePref, PAUSE_OPTIONS, keyLabel } from '../lib/voicePrefs';
+import { getVoicePrefs, setVoicePref, START_OPTIONS, PAUSE_OPTIONS, keyLabel } from '../lib/voicePrefs';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -391,20 +391,21 @@ export default function Settings() {
         <section className="cd-card flex flex-col gap-3">
           <div>
             <h2 className="text-base font-bold text-text">Voice input</h2>
-            <p className="mt-1 text-sm text-text-2">How the assistant listens when you talk to it.</p>
+            <p className="mt-1 text-sm text-text-2">What happens when you open the assistant.</p>
           </div>
           <div className="flex gap-2">
-            {[['auto', 'Auto (pause to send)'], ['hold', 'Hold to talk']].map(([val, label]) => (
+            {START_OPTIONS.map((o) => (
               <button
-                key={val}
-                onClick={() => updVp('inputMode', val)}
-                className={`flex-1 rounded-btn border px-3 py-2 text-sm transition-colors ${vp.inputMode === val ? 'border-[#e08a3c] bg-surface-1 font-semibold text-text' : 'border-surface-3 text-text-2 hover:bg-surface-1'}`}
+                key={o.val}
+                onClick={() => updVp('startMode', o.val)}
+                title={o.hint}
+                className={`flex-1 rounded-btn border px-2 py-2 text-sm transition-colors ${vp.startMode === o.val ? 'border-[#e08a3c] bg-surface-1 font-semibold text-text' : 'border-surface-3 text-text-2 hover:bg-surface-1'}`}
               >
-                {label}
+                {o.label}
               </button>
             ))}
           </div>
-          {vp.inputMode === 'auto' ? (
+          {vp.startMode === 'listen' && (
             <label className="flex items-center justify-between gap-3 text-sm text-text">
               <span>
                 Pause before replying
@@ -414,16 +415,20 @@ export default function Settings() {
                 {PAUSE_OPTIONS.map((o) => (<option key={o.ms} value={o.ms}>{o.label}</option>))}
               </select>
             </label>
-          ) : (
+          )}
+          {vp.startMode === 'hold' && (
             <div className="flex items-center justify-between gap-3 text-sm text-text">
               <span>
                 Push-to-talk key
-                <span className="block text-xs text-text-2">Hold this key (or the mic) to talk; release to send.</span>
+                <span className="block text-xs text-text-2">Hold this key (or the mic) to talk; tap it to interrupt a reply.</span>
               </span>
               <button onClick={() => setCapturing(true)} className="cd-btn cd-btn--secondary min-w-[110px] shrink-0">
                 {capturing ? 'Press a key…' : vp.pttKeyLabel}
               </button>
             </div>
+          )}
+          {vp.startMode === 'text' && (
+            <p className="text-xs text-text-3">The assistant opens to the keyboard; tap the mic anytime to switch to voice.</p>
           )}
         </section>
       )}

@@ -140,7 +140,9 @@ Upcoming schedule: ${JSON.stringify(context.schedule || [])}
 Open tasks: ${JSON.stringify(context.tasks || [])}
 Shared lists (with note ids + items): ${JSON.stringify(context.lists || [])}
 
-Answer questions about the schedule and tasks directly and briefly, reasoning over the data above (e.g. for "is there free time Thursday", look at that day's events). To make changes, call the tools — then confirm what you did in one short sentence. If you don't know who a person is, ask. Don't invent events that aren't in the data. Keep replies short, friendly, and skimmable for a busy kitchen.`;
+Answer questions about the schedule and tasks directly and briefly, reasoning over the data above (e.g. for "is there free time Thursday", look at that day's events). To make changes, call the tools — then confirm what you did in one short sentence. If you don't know who a person is, ask. Don't invent events that aren't in the data. Keep replies short, friendly, and skimmable for a busy kitchen.
+
+CRITICAL: Your replies are spoken aloud and shown as chat bubbles. Reply in plain conversational sentences ONLY. Never use Markdown, code blocks, backticks, asterisks, bullet points, numbered lists, headings, or any formatting symbols. If you need to list a few things, say them in a natural sentence ("You've got soccer at 4 and dinner at 6"). Write the way you'd say it out loud.`;
 
   const apiMessages = messages.map((m) => ({ role: m.role, content: m.content }));
   const actions = [];

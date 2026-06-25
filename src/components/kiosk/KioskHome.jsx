@@ -4,6 +4,10 @@ import { CalendarDays, CheckSquare, PenLine, StickyNote } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useScheduleBlocks } from '../../hooks/useScheduleBlocks';
 import { useTasks } from '../../hooks/useTasks';
+import { useEvents, expandEvents } from '../../hooks/useEvents';
+import { useGoogleCalendar } from '../../hooks/useGoogleCalendar';
+import { useWorkSchedule } from '../../hooks/useWorkSchedule';
+import { useCalendars } from '../../hooks/useCalendars';
 import { useWhiteboard } from '../../hooks/useWhiteboard';
 import MemberChip from '../members/MemberChip';
 import WhiteboardPreview from '../fridge/WhiteboardPreview';
@@ -29,15 +33,43 @@ function fmtClock(minOfDay) {
 export default function KioskHome() {
   const { household, members } = useApp();
   const { blocks } = useScheduleBlocks(household?.id);
-  const { tasks } = useTasks(household?.id);
+  const { tasks, toggleDone } = useTasks(household?.id);
+  const { events: appRaw } = useEvents(household?.id);
+  const { calendars } = useCalendars(household?.id);
+  const { events: gcalEvents } = useGoogleCalendar();
+  const { events: workEvents } = useWorkSchedule();
   const { strokes: fridgeStrokes } = useWhiteboard(household?.id);
   const now = useClock();
   const memberById = new Map(members.map((m) => [m.id, m]));
 
   const todayIso = isoDay(now.getTime());
-  const agenda = blocks
-    .filter((b) => b.day === todayIso)
-    .sort((a, z) => (a.start_min ?? 1e9) - (z.start_min ?? 1e9));
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const t0 = dayStart.getTime();
+  const t1 = t0 + 86_400_000;
+  const calById = new Map((calendars || []).map((c) => [c.id, c]));
+  const minOfDay = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+
+  // Everything happening today, across every source the calendar shows.
+  const agenda = [];
+  for (const b of blocks) {
+    if (b.day !== todayIso) continue;
+    const m = memberById.get(b.member_id);
+    agenda.push({ key: `b-${b.id}`, min: b.start_min ?? null, title: b.title, member: m, color: m?.color });
+  }
+  for (const e of expandEvents(appRaw || [], { fromMs: t0, toMs: t1, calendarsById: calById })) {
+    const s = new Date(e.start).getTime();
+    if (isoDay(s) !== todayIso) continue;
+    const m = memberById.get(e.member_id);
+    agenda.push({ key: `a-${e.id || e.summary}-${s}`, min: e.allDay ? null : minOfDay(s), title: e.summary, member: m, color: e.color || m?.color });
+  }
+  for (const e of [...(gcalEvents || []), ...(workEvents || [])]) {
+    const s = new Date(e.start).getTime();
+    if (isoDay(s) !== todayIso) continue;
+    const m = memberById.get(e.member_id);
+    agenda.push({ key: `g-${e.id || e.summary}-${s}`, min: e.allDay ? null : minOfDay(s), title: e.summary, member: m, color: e.color || m?.color });
+  }
+  agenda.sort((a, z) => (a.min ?? -1) - (z.min ?? -1));
 
   const openTasks = tasks.filter((t) => !t.done);
   const dueToday = openTasks.filter((t) => t.due_date === todayIso);
@@ -74,20 +106,16 @@ export default function KioskHome() {
           </header>
           <div className="cd-scroll flex flex-col gap-1.5">
             {agenda.length === 0 && <p className="cd-mono-label py-8 text-center">nothing scheduled today</p>}
-            {agenda.map((b) => {
-              const m = memberById.get(b.member_id);
-              const color = m?.color || '#7a6f5f';
-              return (
-                <div key={b.id} className="flex items-center gap-3 rounded-btn border border-surface-3 bg-surface-0 p-2.5">
-                  <span className="w-16 shrink-0 font-mono text-xs text-text-2">
-                    {b.start_min != null ? fmtClock(b.start_min) : '—'}
-                  </span>
-                  <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-text">{b.title}</span>
-                  {m && <MemberChip member={m} size={26} />}
-                </div>
-              );
-            })}
+            {agenda.map((it) => (
+              <div key={it.key} className="flex items-center gap-3 rounded-btn border border-surface-3 bg-surface-0 p-2.5">
+                <span className="w-16 shrink-0 font-mono text-xs text-text-2">
+                  {it.min != null ? fmtClock(it.min) : 'all day'}
+                </span>
+                <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: it.color || '#7a6f5f' }} />
+                <span className="min-w-0 flex-1 truncate text-sm font-bold text-text">{it.title}</span>
+                {it.member && <MemberChip member={it.member} size={26} />}
+              </div>
+            ))}
           </div>
         </section>
 
@@ -105,10 +133,15 @@ export default function KioskHome() {
               {(dueToday.length ? dueToday : openTasks.slice(0, 6)).map((t) => {
                 const m = memberById.get(t.assigned_to);
                 return (
-                  <div key={t.id} className="flex items-center gap-2.5 rounded-btn border border-surface-3 p-2">
-                    {m ? <MemberChip member={m} size={24} /> : <span className="h-6 w-6 rounded-squircle bg-surface-3" />}
+                  <button
+                    key={t.id}
+                    onClick={() => toggleDone(t)}
+                    className="flex w-full items-center gap-2.5 rounded-btn border border-surface-3 p-2 text-left transition-colors hover:bg-surface-1"
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-surface-3" aria-hidden />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{t.title}</span>
-                  </div>
+                    {m && <MemberChip member={m} size={24} />}
+                  </button>
                 );
               })}
             </div>
