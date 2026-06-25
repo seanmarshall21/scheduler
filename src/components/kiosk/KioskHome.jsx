@@ -38,7 +38,7 @@ export default function KioskHome() {
   const { calendars } = useCalendars(household?.id);
   const { events: gcalEvents } = useGoogleCalendar();
   const { events: workEvents } = useWorkSchedule();
-  const { strokes: fridgeStrokes } = useWhiteboard(household?.id);
+  const { strokes: fridgeStrokes, items: fridgeItems } = useWhiteboard(household?.id);
   const now = useClock();
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -152,8 +152,8 @@ export default function KioskHome() {
               <PenLine className="h-4 w-4 text-text-3" />
             </div>
             <div className="overflow-hidden rounded-lg border border-surface-3 bg-white">
-              {fridgeStrokes.length ? (
-                <WhiteboardPreview strokes={fridgeStrokes} className="aspect-[5/3] w-full" />
+              {fridgeStrokes.length || fridgeItems.length ? (
+                <WhiteboardPreview strokes={fridgeStrokes} items={fridgeItems} className="aspect-[5/3] w-full" />
               ) : (
                 <div className="flex aspect-[5/3] items-center justify-center">
                   <span className="cd-mono-label">tap to leave a note</span>

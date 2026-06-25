@@ -22,7 +22,7 @@ const TOURS = {
     { selector: '[data-tour="home-clock"]', title: 'Today at a glance', body: 'The big clock and date — built to read across the kitchen. Everyone in the home shows up here.' },
     { selector: '[data-tour="home-agenda"]', title: 'Today’s agenda', body: 'Everything scheduled today, color-coded per person. Tap “open calendar” for the full board.' },
     { selector: '[data-tour="home-tasks"]', title: 'What’s due', body: 'Tasks due today (or what’s open). Tap “all” to manage them.' },
-    { selector: '[data-tour="home-fridge"]', title: 'The fridge', body: 'A shared whiteboard — draw or jot a note with your finger. It shows here and pops up for everyone when it changes.' },
+    { selector: '[data-tour="home-fridge"]', title: 'The fridge', body: 'A shared board — doodle, drop a sticky note, or add a photo. It shows here and pops up for everyone when it changes.' },
     { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On the shared screen, tap here to switch which member you are.' },
   ],
   '/tasks': [
@@ -70,7 +70,7 @@ export default function AppShell() {
     if (evaluated.current || !household?.id || !board) return;
     evaluated.current = true;
     const seen = localStorage.getItem(`commons.fridge.seen.${household.id}`);
-    if ((board.strokes?.length || 0) > 0 && board.updated_at && board.updated_at !== seen) setFridgePopup(true);
+    if (((board.strokes?.length || 0) + (board.items?.length || 0)) > 0 && board.updated_at && board.updated_at !== seen) setFridgePopup(true);
   }, [household, board]);
   const dismissFridge = () => {
     if (household?.id && board?.updated_at) localStorage.setItem(`commons.fridge.seen.${household.id}`, board.updated_at);
@@ -140,7 +140,7 @@ export default function AppShell() {
           <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 text-base font-bold text-text">📌 On the fridge</h3>
             <div className="overflow-hidden rounded-lg border border-surface-3 bg-white">
-              <WhiteboardPreview strokes={board.strokes} className="aspect-[5/3] w-full" />
+              <WhiteboardPreview strokes={board.strokes} items={board.items} className="aspect-[5/3] w-full" />
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button onClick={dismissFridge} className="cd-btn cd-btn--ghost">Got it</button>

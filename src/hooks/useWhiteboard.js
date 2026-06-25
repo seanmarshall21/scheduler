@@ -46,10 +46,11 @@ export function useWhiteboard(householdId) {
   }, [householdId, load]);
 
   const save = useCallback(
-    async (strokes, memberId) => {
+    async (strokes, items, memberId) => {
       const row = {
         household_id: householdId,
         strokes,
+        items: items || [],
         updated_by: memberId || null,
         updated_at: new Date().toISOString(),
       };
@@ -63,5 +64,5 @@ export function useWhiteboard(householdId) {
     [householdId]
   );
 
-  return { board, strokes: board?.strokes || [], loading, save, reload: () => load({ background: true }) };
+  return { board, strokes: board?.strokes || [], items: board?.items || [], loading, save, reload: () => load({ background: true }) };
 }
