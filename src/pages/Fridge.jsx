@@ -48,11 +48,11 @@ export default function Fridge() {
   const photoInput = useRef(null);
   const navigate = useNavigate();
 
-  // Seed local state from the loaded board once.
+  // Seed local state from the loaded board once (dropping any corrupt entries).
   useEffect(() => {
     if (!loading && !ready) {
-      setStrokes(initStrokes || []);
-      setItems(initItems || []);
+      setStrokes((initStrokes || []).filter((s) => s && Array.isArray(s.p)));
+      setItems((initItems || []).filter(Boolean));
       setReady(true);
     }
   }, [loading, initStrokes, initItems, ready]);
@@ -63,15 +63,16 @@ export default function Fridge() {
   const strokesRef = useRef([]);
   strokesRef.current = strokes;
 
-  const drawStroke = (ctx, s, scale) => {
-    if (!s.p || s.p.length < 1) return;
+  const drawStroke = (ctx, s, sx, sy) => {
+    if (!s || !Array.isArray(s.p) || s.p.length < 1) return; // skip corrupt strokes
     ctx.beginPath();
     ctx.strokeStyle = s.c || '#37322b';
-    ctx.lineWidth = (s.w || 6) * scale;
+    ctx.lineWidth = (s.w || 6) * sx;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    s.p.forEach(([x, y], i) => {
-      const px = x * scale; const py = y * scale;
+    s.p.forEach((pt, i) => {
+      if (!pt) return;
+      const px = pt[0] * sx; const py = pt[1] * sy;
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     });
     ctx.stroke();
@@ -82,16 +83,16 @@ export default function Fridge() {
     const ctx = c.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, c.width, c.height);
-    const scale = c.width / VW;
-    for (const s of strokesRef.current) drawStroke(ctx, s, scale);
-    if (drawing.current) drawStroke(ctx, drawing.current, scale); // keep the in-progress line
+    const sx = c.width / VW; const sy = c.height / VH;
+    for (const s of strokesRef.current) drawStroke(ctx, s, sx, sy);
+    if (drawing.current) drawStroke(ctx, drawing.current, sx, sy); // keep the in-progress line
   };
   const sizeCanvas = () => {
     const c = canvasRef.current;
     if (!c) return;
     const r = c.getBoundingClientRect();
     if (!r.width || !r.height) return; // ignore transient 0-size layouts
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(r.width * dpr);
     const h = Math.round(r.height * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
@@ -232,11 +233,11 @@ export default function Fridge() {
       <input ref={imgInput} type="file" accept="image/*" className="hidden" onChange={(e) => { addImageFile(e.target.files?.[0]); e.target.value = ''; }} />
       <input ref={photoInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { addImageFile(e.target.files?.[0]); e.target.value = ''; }} />
 
-      <div className="cd-card flex min-h-0 flex-1 items-center justify-center !p-2">
+      <div className="cd-card flex min-h-0 flex-1 !p-1.5">
         <div
           ref={boardRef}
           onPointerDown={() => { if (mode === 'move') { setSelectedId(null); setEditingId(null); } }}
-          className="relative aspect-[5/3] w-full max-w-[900px] overflow-hidden rounded-lg bg-white"
+          className="relative h-full w-full overflow-hidden rounded-lg bg-white"
           style={{ touchAction: 'none' }}
         >
           <canvas
