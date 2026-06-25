@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
-import { Mic, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Keyboard, Mic, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { speak as speakText } from '../../lib/speech';
+import { speak as speakText, stopSpeaking } from '../../lib/speech';
 import { useApp } from '../../context/AppContext';
 import { useScheduleBlocks } from '../../hooks/useScheduleBlocks';
 import { useGoogleCalendar } from '../../hooks/useGoogleCalendar';
@@ -22,7 +22,24 @@ const startOfToday = () => {
   return d.getTime();
 };
 
-export default function Assistant({ onClose }) {
+// A varied, time-aware opener spoken when the assistant opens in voice mode.
+function greeting() {
+  const h = new Date().getHours();
+  const tod = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const opts = [
+    `${tod}! How can I help?`,
+    `${tod}! What can I do for you?`,
+    `${tod} — what do you need?`,
+    "Hey there! What's up?",
+    'Hi! What can I help with?',
+    `${tod}! What's on the agenda?`,
+  ];
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+const micAvailable = typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+export default function Assistant({ onClose, voiceFirst = false }) {
   const { household, members, activeMemberId } = useApp();
   const { blocks, refetch: refetchBlocks } = useScheduleBlocks(household?.id);
   const { events: gcalEvents } = useGoogleCalendar();
@@ -35,10 +52,15 @@ export default function Assistant({ onClose }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [speak, setSpeak] = useState(false);
+  const [speak, setSpeak] = useState(voiceFirst);
+  const [mode, setMode] = useState(voiceFirst && micAvailable ? 'voice' : 'text');
   const [listening, setListening] = useState(false);
   const recRef = useRef(null);
+  const modeRef = useRef(mode);
+  const greeted = useRef(false);
   const scrollRef = useRef(null);
+
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   const nameOf = (id) => members.find((m) => m.id === id)?.name || 'someone';
 
@@ -75,6 +97,26 @@ export default function Assistant({ onClose }) {
     };
   };
 
+  const startListening = () => {
+    const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SR) return;
+    try { recRef.current?.abort?.(); } catch { /* noop */ }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.onresult = (e) => { setListening(false); send(e.results[0][0].transcript); };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    setListening(true);
+    try { rec.start(); } catch { setListening(false); }
+  };
+
+  const stopListening = () => {
+    try { recRef.current?.stop(); } catch { /* noop */ }
+    setListening(false);
+  };
+
   const send = async (text) => {
     const content = (text ?? input).trim();
     if (!content || busy) return;
@@ -98,7 +140,10 @@ export default function Assistant({ onClose }) {
         refetchNotes?.();
         refetchBlocks?.();
       }
-      if (speak && reply) speakText(reply);
+      if ((speak || modeRef.current === 'voice') && reply) {
+        await speakText(reply);
+        if (modeRef.current === 'voice') startListening(); // keep the conversation going, hands-free
+      }
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'I couldn’t reach the assistant.' }]);
     } finally {
@@ -107,21 +152,28 @@ export default function Assistant({ onClose }) {
     }
   };
 
-  const micAvailable = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
-  const toggleMic = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    if (listening) { recRef.current?.stop(); return; }
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    rec.onresult = (e) => { setListening(false); send(e.results[0][0].transcript); };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    rec.start();
-  };
+  // On open in voice mode: greet aloud, then start listening.
+  useEffect(() => {
+    if (greeted.current) return;
+    greeted.current = true;
+    if (mode !== 'voice') return;
+    (async () => {
+      const g = greeting();
+      setMessages([{ role: 'assistant', content: g }]);
+      await speakText(g);
+      if (modeRef.current === 'voice') startListening();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cleanup on close.
+  useEffect(() => () => {
+    try { recRef.current?.abort?.(); } catch { /* noop */ }
+    stopSpeaking();
+  }, []);
+
+  const switchToText = () => { stopListening(); stopSpeaking(); setMode('text'); };
+  const switchToVoice = () => { setMode('voice'); startListening(); };
 
   const suggestions = ['Anything on Thursday?', "What's due today?", 'Add milk to the groceries'];
 
@@ -135,9 +187,11 @@ export default function Assistant({ onClose }) {
             <h3 className="text-base font-bold text-text">Ask Commons</h3>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => setSpeak((s) => !s)} title="Speak replies aloud" className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1">
-              {speak ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </button>
+            {mode === 'text' && (
+              <button onClick={() => setSpeak((s) => !s)} title="Speak replies aloud" className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1">
+                {speak ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </button>
+            )}
             <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1"><X className="h-4 w-4" /></button>
           </div>
         </div>
@@ -161,15 +215,31 @@ export default function Assistant({ onClose }) {
           {busy && <div className="flex justify-start"><div className="rounded-2xl bg-surface-1 px-3 py-2 text-sm text-text-3 animate-pulse">…</div></div>}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-surface-3 p-3">
-          {micAvailable && (
-            <button onClick={toggleMic} aria-label="Speak" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${listening ? 'animate-pulse bg-[#e0603c] text-white' : 'border border-surface-3 text-text-2'}`}>
-              <Mic className="h-5 w-5" />
+        {mode === 'voice' ? (
+          <div className="flex flex-col items-center gap-2 border-t border-surface-3 p-4">
+            <button
+              onClick={listening ? stopListening : startListening}
+              aria-label={listening ? 'Stop listening' : 'Start talking'}
+              className={`flex h-16 w-16 items-center justify-center rounded-full transition-transform hover:scale-105 ${listening ? 'animate-pulse bg-[#e0603c] text-white' : 'bg-text text-white'}`}
+            >
+              <Mic className="h-7 w-7" />
             </button>
-          )}
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Ask or tell Commons…" className="cd-input flex-1" />
-          <button onClick={() => send()} disabled={busy || !input.trim()} className="cd-btn cd-btn--accent flex h-10 w-10 shrink-0 items-center justify-center !p-0"><Send className="h-4 w-4" /></button>
-        </div>
+            <p className="text-xs text-text-3">{busy ? 'Thinking…' : listening ? 'Listening… tap to stop' : 'Tap to talk'}</p>
+            <button onClick={switchToText} className="mt-1 flex items-center gap-1.5 text-xs text-text-2 hover:text-text">
+              <Keyboard className="h-3.5 w-3.5" /> Type instead
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 border-t border-surface-3 p-3">
+            {micAvailable && (
+              <button onClick={switchToVoice} aria-label="Talk" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-surface-3 text-text-2 hover:bg-surface-1">
+                <Mic className="h-5 w-5" />
+              </button>
+            )}
+            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Ask or tell Commons…" className="cd-input flex-1" />
+            <button onClick={() => send()} disabled={busy || !input.trim()} className="cd-btn cd-btn--accent flex h-10 w-10 shrink-0 items-center justify-center !p-0"><Send className="h-4 w-4" /></button>
+          </div>
+        )}
       </div>
     </div>
   );

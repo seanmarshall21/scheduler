@@ -59,7 +59,7 @@ export default function AppShell() {
 
   const steps = [
     ...(TOURS[pathname] || GENERIC),
-    { selector: '[data-tour="ask"]', title: 'Ask Commons', body: 'Your assistant. Ask “anything Thursday?”, or tell it to add a task, an event, or a list item — by text or voice.' },
+    { selector: '[data-tour="ask"]', title: 'Ask Commons', body: 'Your assistant. Tap it and just start talking — ask “anything Thursday?” or say “add milk to the groceries.” Prefer typing? Tap “Type instead.”' },
   ];
 
   // Fridge sign-in alert: pop the whiteboard once per app load if it changed.
@@ -158,7 +158,7 @@ export default function AppShell() {
       >
         <Sparkles className="h-6 w-6" />
       </button>
-      {assistantOpen && <Assistant onClose={() => setAssistantOpen(false)} />}
+      {assistantOpen && <Assistant voiceFirst onClose={() => setAssistantOpen(false)} />}
     </div>
   );
 }

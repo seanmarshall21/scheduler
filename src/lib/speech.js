@@ -37,13 +37,17 @@ export function onVoicesReady(cb) {
 }
 
 function speakBrowser(text) {
-  if (typeof window === 'undefined' || !window.speechSynthesis || !text) return;
-  const u = new SpeechSynthesisUtterance(text);
-  const voices = listVoices();
-  const chosen = voices.find((v) => v.name === getVoiceName()) || preferredVoice(voices);
-  if (chosen) u.voice = chosen;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || !text) { resolve(); return; }
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = listVoices();
+    const chosen = voices.find((v) => v.name === getVoiceName()) || preferredVoice(voices);
+    if (chosen) u.voice = chosen;
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  });
 }
 
 // ── Cloud (Google) TTS ──────────────────────────────────────────────────────
@@ -86,6 +90,13 @@ async function speakCloud(text) {
   if (!audioEl) audioEl = new Audio();
   audioEl.src = `data:audio/mp3;base64,${data.audio}`;
   await audioEl.play();
+  await new Promise((resolve) => { audioEl.onended = resolve; audioEl.onerror = resolve; });
+}
+
+// Stop any in-progress speech (cloud audio or browser synthesis).
+export function stopSpeaking() {
+  if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+  if (audioEl) { try { audioEl.pause(); audioEl.currentTime = 0; } catch { /* noop */ } }
 }
 
 // Speak `text` — Google Cloud TTS if available, else the browser voice.
