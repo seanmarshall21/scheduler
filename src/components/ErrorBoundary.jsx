@@ -13,7 +13,6 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // eslint-disable-next-line no-console
     console.error('[Commons] crashed:', error, info?.componentStack);
   }
 
