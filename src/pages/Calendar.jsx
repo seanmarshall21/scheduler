@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, X, Trash2 } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useScheduleBlocks } from '../hooks/useScheduleBlocks';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
@@ -337,23 +337,6 @@ export default function Calendar() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
-      {/* Per-person filter chips */}
-      <div data-tour="cal-filter" className="flex flex-wrap items-center gap-2">
-        {members.map((m) => {
-          const on = !hidden.has(m.id);
-          return (
-            <button key={m.id} onClick={() => toggleMember(m.id)}
-              className={`flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 transition-all ${on ? 'border-surface-3 bg-surface-0' : 'border-surface-3 bg-surface-1 opacity-40'}`}>
-              <MemberChip member={m} size={24} />
-              <span className="text-xs font-medium text-text">{m.name}</span>
-            </button>
-          );
-        })}
-        <button data-tour="cal-add-event" onClick={() => setShowEvent(true)} className="cd-btn cd-btn--accent ml-auto flex items-center gap-1.5 !py-1.5">
-          <Plus className="h-4 w-4" /> Event
-        </button>
-      </div>
-
       <div data-tour="cal-grid" className="flex min-h-0 flex-1 flex-col">
         <FamilyCalendar
           className="min-h-0 flex-1"
@@ -362,6 +345,8 @@ export default function Calendar() {
           events={events}
           activeMemberId={activeMemberId}
           visibleMemberIds={visibleMemberIds}
+          onToggleMember={toggleMember}
+          onAddEvent={() => setShowEvent(true)}
           onAddBlock={(seed) => setSheet(seed)}
           onUpdateBlock={updateBlock}
           onRemoveBlock={removeBlock}

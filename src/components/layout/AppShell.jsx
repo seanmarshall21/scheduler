@@ -35,8 +35,9 @@ const TOURS = {
     { selector: '[data-tour="note-grid"]', title: 'Your notes', body: 'Everything the household has jotted. Edit in place; check off list items together.' },
   ],
   '/calendar': [
-    { selector: '[data-tour="cal-filter"]', title: 'Filter by person', body: 'Tap a person to show or hide their items on the board.' },
-    { selector: '[data-tour="cal-add-event"]', title: 'Add an event', body: 'Create an event on one of your own calendars — choose who it’s for, the time, and whether it repeats.' },
+    { selector: '[data-tour="cal-filter"]', title: 'Who’s showing', body: 'Tap a person to show or hide their items — right in the calendar frame.' },
+    { selector: '[data-tour="cal-views"]', title: 'Views', body: 'Switch between List, 1-day, 3-day, Week, and Month. The orange line marks the current time.' },
+    { selector: '[data-tour="cal-add-event"]', title: 'Add an event', body: 'Create an event on one of your own calendars — who it’s for, the time, and whether it repeats.' },
     { selector: '[data-tour="cal-grid"]', title: 'The board', body: 'Everyone’s blocks and events, color-coded. Drag a block to move it; tap an event to edit or delete it.' },
   ],
   '/settings': [
