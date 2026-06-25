@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { CalendarDays, CheckSquare, HelpCircle, Home, Settings, StickyNote } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { CalendarDays, CheckSquare, HelpCircle, Home, PenLine, Settings, StickyNote } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useWhiteboard } from '../../hooks/useWhiteboard';
 import MemberSwitcher from '../members/MemberSwitcher';
 import Walkthrough from '../Walkthrough';
+import WhiteboardPreview from '../fridge/WhiteboardPreview';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -19,6 +21,7 @@ const TOURS = {
     { selector: '[data-tour="home-clock"]', title: 'Today at a glance', body: 'The big clock and date — built to read across the kitchen. Everyone in the home shows up here.' },
     { selector: '[data-tour="home-agenda"]', title: 'Today’s agenda', body: 'Everything scheduled today, color-coded per person. Tap “open calendar” for the full board.' },
     { selector: '[data-tour="home-tasks"]', title: 'What’s due', body: 'Tasks due today (or what’s open). Tap “all” to manage them.' },
+    { selector: '[data-tour="home-fridge"]', title: 'The fridge', body: 'A shared whiteboard — draw or jot a note with your finger. It shows here and pops up for everyone when it changes.' },
     { selector: '[data-tour="whoami"]', title: 'Who are you?', body: 'On the shared screen, tap here to switch which member you are.' },
   ],
   '/tasks': [
@@ -49,9 +52,25 @@ const GENERIC = [
 export default function AppShell() {
   const { household } = useApp();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [tour, setTour] = useState(false);
 
   const steps = TOURS[pathname] || GENERIC;
+
+  // Fridge sign-in alert: pop the whiteboard once per app load if it changed.
+  const { board } = useWhiteboard(household?.id);
+  const [fridgePopup, setFridgePopup] = useState(false);
+  const evaluated = useRef(false);
+  useEffect(() => {
+    if (evaluated.current || !household?.id || !board) return;
+    evaluated.current = true;
+    const seen = localStorage.getItem(`commons.fridge.seen.${household.id}`);
+    if ((board.strokes?.length || 0) > 0 && board.updated_at && board.updated_at !== seen) setFridgePopup(true);
+  }, [household, board]);
+  const dismissFridge = () => {
+    if (household?.id && board?.updated_at) localStorage.setItem(`commons.fridge.seen.${household.id}`, board.updated_at);
+    setFridgePopup(false);
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -62,6 +81,14 @@ export default function AppShell() {
           <span className="text-sm font-bold text-text">{household?.name || 'Commons'}</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => navigate('/fridge')}
+            aria-label="The fridge"
+            title="The fridge"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1 hover:text-text"
+          >
+            <PenLine className="h-5 w-5" />
+          </button>
           <button
             onClick={() => setTour(true)}
             aria-label="Show me around this page"
@@ -102,6 +129,21 @@ export default function AppShell() {
       </nav>
 
       {tour && <Walkthrough steps={steps} onClose={() => setTour(false)} />}
+
+      {fridgePopup && pathname !== '/fridge' && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 p-6" onClick={dismissFridge}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 text-base font-bold text-text">📌 On the fridge</h3>
+            <div className="overflow-hidden rounded-lg border border-surface-3 bg-white">
+              <WhiteboardPreview strokes={board.strokes} className="aspect-[5/3] w-full" />
+            </div>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button onClick={dismissFridge} className="cd-btn cd-btn--ghost">Got it</button>
+              <button onClick={() => { dismissFridge(); navigate('/fridge'); }} className="cd-btn cd-btn--accent">Open the fridge</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

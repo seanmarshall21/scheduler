@@ -9,6 +9,7 @@ import Welcome from './pages/Welcome';
 import Join from './pages/Join';
 import Home from './pages/Home';
 import Calendar from './pages/Calendar';
+import Fridge from './pages/Fridge';
 import Tasks from './pages/Tasks';
 import Notes from './pages/Notes';
 import Settings from './pages/Settings';
@@ -26,6 +27,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route path="/" element={<Home />} />
                 <Route path="/calendar" element={<Calendar />} />
+                <Route path="/fridge" element={<Fridge />} />
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/notes" element={<Notes />} />
                 <Route path="/settings" element={<Settings />} />

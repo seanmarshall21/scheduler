@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, CheckSquare, StickyNote } from 'lucide-react';
+import { CalendarDays, CheckSquare, PenLine, StickyNote } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useScheduleBlocks } from '../../hooks/useScheduleBlocks';
 import { useTasks } from '../../hooks/useTasks';
+import { useWhiteboard } from '../../hooks/useWhiteboard';
 import MemberChip from '../members/MemberChip';
+import WhiteboardPreview from '../fridge/WhiteboardPreview';
 import { isoDay } from '../calendar/FamilyCalendar';
 
 function useClock() {
@@ -28,6 +30,7 @@ export default function KioskHome() {
   const { household, members } = useApp();
   const { blocks } = useScheduleBlocks(household?.id);
   const { tasks } = useTasks(household?.id);
+  const { strokes: fridgeStrokes } = useWhiteboard(household?.id);
   const now = useClock();
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -110,6 +113,22 @@ export default function KioskHome() {
               })}
             </div>
           </section>
+          <Link to="/fridge" data-tour="home-fridge" className="cd-card flex flex-col gap-1.5 !p-2 transition-shadow hover:ring-2 hover:ring-surface-3">
+            <div className="flex items-center justify-between px-1">
+              <span className="cd-mono-label">the fridge</span>
+              <PenLine className="h-4 w-4 text-text-3" />
+            </div>
+            <div className="overflow-hidden rounded-lg border border-surface-3 bg-white">
+              {fridgeStrokes.length ? (
+                <WhiteboardPreview strokes={fridgeStrokes} className="aspect-[5/3] w-full" />
+              ) : (
+                <div className="flex aspect-[5/3] items-center justify-center">
+                  <span className="cd-mono-label">tap to leave a note</span>
+                </div>
+              )}
+            </div>
+          </Link>
+
           <Link to="/notes" className="cd-tile !min-h-0 flex-row items-center justify-start gap-3 !py-4">
             <StickyNote className="h-5 w-5 text-text-2" />
             <span className="text-sm font-bold text-text">Household notes & lists</span>
