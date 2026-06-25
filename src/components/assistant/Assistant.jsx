@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Mic, Send, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { speak as speakText, stopSpeaking } from '../../lib/speech';
+import { getVoicePrefs } from '../../lib/voicePrefs';
+import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useApp } from '../../context/AppContext';
 import { useScheduleBlocks } from '../../hooks/useScheduleBlocks';
 import { useGoogleCalendar } from '../../hooks/useGoogleCalendar';
@@ -22,7 +24,6 @@ const startOfToday = () => {
   return d.getTime();
 };
 
-// A varied, time-aware opener spoken when the assistant opens in voice mode.
 function greeting() {
   const h = new Date().getHours();
   const tod = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -49,15 +50,15 @@ export default function Assistant({ onClose, voiceFirst = false }) {
   const { tasks, refetch: refetchTasks } = useTasks(household?.id);
   const { notes, refetch: refetchNotes } = useNotes(household?.id);
 
+  const prefs = useRef(getVoicePrefs()).current;
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [speak, setSpeak] = useState(voiceFirst);
   const [mode, setMode] = useState(voiceFirst && micAvailable ? 'voice' : 'text');
-  const [listening, setListening] = useState(false);
-  const recRef = useRef(null);
   const modeRef = useRef(mode);
   const greeted = useRef(false);
+  const speakingRef = useRef(false);
   const scrollRef = useRef(null);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -97,25 +98,19 @@ export default function Assistant({ onClose, voiceFirst = false }) {
     };
   };
 
-  const startListening = () => {
-    const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
-    if (!SR) return;
-    try { recRef.current?.abort?.(); } catch { /* noop */ }
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    rec.onresult = (e) => { setListening(false); send(e.results[0][0].transcript); };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    try { rec.start(); } catch { setListening(false); }
+  // Speak a reply while flagging TTS so the mic can suppress echo / allow barge-in.
+  const speakReply = async (text) => {
+    speakingRef.current = true;
+    try { await speakText(text); } finally { speakingRef.current = false; }
   };
 
-  const stopListening = () => {
-    try { recRef.current?.stop(); } catch { /* noop */ }
-    setListening(false);
-  };
+  const voice = useVoiceInput({
+    mode: prefs.inputMode,
+    pauseMs: prefs.pauseMs,
+    speakingRef,
+    onFinal: (t) => send(t),
+    onSpeechStart: () => { if (speakingRef.current) { stopSpeaking(); speakingRef.current = false; } },
+  });
 
   const send = async (text) => {
     const content = (text ?? input).trim();
@@ -140,10 +135,7 @@ export default function Assistant({ onClose, voiceFirst = false }) {
         refetchNotes?.();
         refetchBlocks?.();
       }
-      if ((speak || modeRef.current === 'voice') && reply) {
-        await speakText(reply);
-        if (modeRef.current === 'voice') startListening(); // keep the conversation going, hands-free
-      }
+      if ((speak || modeRef.current === 'voice') && reply) await speakReply(reply);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'I couldn’t reach the assistant.' }]);
     } finally {
@@ -152,7 +144,7 @@ export default function Assistant({ onClose, voiceFirst = false }) {
     }
   };
 
-  // On open in voice mode: greet aloud, then start listening.
+  // On open in voice mode: greet aloud, then (auto mode) start listening.
   useEffect(() => {
     if (greeted.current) return;
     greeted.current = true;
@@ -160,20 +152,54 @@ export default function Assistant({ onClose, voiceFirst = false }) {
     (async () => {
       const g = greeting();
       setMessages([{ role: 'assistant', content: g }]);
-      await speakText(g);
-      if (modeRef.current === 'voice') startListening();
+      await speakReply(g);
+      if (modeRef.current === 'voice' && prefs.inputMode === 'auto') voice.start();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cleanup on close.
-  useEffect(() => () => {
-    try { recRef.current?.abort?.(); } catch { /* noop */ }
-    stopSpeaking();
-  }, []);
+  // Push-to-talk key (hold mode): hold the configured key to talk.
+  useEffect(() => {
+    if (mode !== 'voice' || prefs.inputMode !== 'hold') return undefined;
+    const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    const down = (e) => {
+      if (e.code !== prefs.pttKey || e.repeat || isTyping(e.target)) return;
+      e.preventDefault();
+      stopSpeaking();
+      speakingRef.current = false;
+      voice.start();
+    };
+    const up = (e) => {
+      if (e.code !== prefs.pttKey) return;
+      e.preventDefault();
+      voice.stop(true);
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
-  const switchToText = () => { stopListening(); stopSpeaking(); setMode('text'); };
-  const switchToVoice = () => { setMode('voice'); startListening(); };
+  // Cleanup on close.
+  useEffect(() => () => { stopSpeaking(); }, []);
+
+  const switchToText = () => { voice.stop(); stopSpeaking(); setMode('text'); };
+  const switchToVoice = () => { setMode('voice'); if (prefs.inputMode === 'auto') voice.start(); };
+
+  const holdProps = prefs.inputMode === 'hold'
+    ? {
+        onPointerDown: () => { stopSpeaking(); speakingRef.current = false; voice.start(); },
+        onPointerUp: () => voice.stop(true),
+        onPointerLeave: () => voice.listening && voice.stop(true),
+        onPointerCancel: () => voice.stop(true),
+      }
+    : { onClick: () => (voice.listening ? voice.stop() : voice.start()) };
+
+  const hint = busy
+    ? 'Thinking…'
+    : voice.listening
+      ? (prefs.inputMode === 'hold' ? 'Listening… release to send' : 'Listening… tap to stop')
+      : (prefs.inputMode === 'hold' ? `Hold the mic or ${prefs.pttKeyLabel} to talk` : 'Tap to talk');
 
   const suggestions = ['Anything on Thursday?', "What's due today?", 'Add milk to the groceries'];
 
@@ -217,14 +243,15 @@ export default function Assistant({ onClose, voiceFirst = false }) {
 
         {mode === 'voice' ? (
           <div className="flex flex-col items-center gap-2 border-t border-surface-3 p-4">
+            {voice.interim && <p className="line-clamp-2 max-w-full px-2 text-center text-sm text-text-2">{voice.interim}</p>}
             <button
-              onClick={listening ? stopListening : startListening}
-              aria-label={listening ? 'Stop listening' : 'Start talking'}
-              className={`flex h-16 w-16 items-center justify-center rounded-full transition-transform hover:scale-105 ${listening ? 'animate-pulse bg-[#e0603c] text-white' : 'bg-text text-white'}`}
+              {...holdProps}
+              aria-label={voice.listening ? 'Listening' : 'Talk'}
+              className={`flex h-16 w-16 select-none items-center justify-center rounded-full transition-transform hover:scale-105 ${voice.listening ? 'scale-110 animate-pulse bg-[#e0603c] text-white' : 'bg-text text-white'}`}
             >
               <Mic className="h-7 w-7" />
             </button>
-            <p className="text-xs text-text-3">{busy ? 'Thinking…' : listening ? 'Listening… tap to stop' : 'Tap to talk'}</p>
+            <p className="text-xs text-text-3">{hint}</p>
             <button onClick={switchToText} className="mt-1 flex items-center gap-1.5 text-xs text-text-2 hover:text-text">
               <Keyboard className="h-3.5 w-3.5" /> Type instead
             </button>
