@@ -39,13 +39,15 @@ export function setVoiceSel(val) {
 
 function speakBrowser(text, name) {
   return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis || !text) { resolve(); return; }
+    const finish = () => { if (endResolve === finish) endResolve = null; resolve(); };
+    if (typeof window === 'undefined' || !window.speechSynthesis || !text) { finish(); return; }
+    endResolve = finish;
     const u = new SpeechSynthesisUtterance(text);
     const voices = listVoices();
     const chosen = (name && voices.find((v) => v.name === name)) || preferredVoice(voices);
     if (chosen) u.voice = chosen;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.onend = finish;
+    u.onerror = finish;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   });
@@ -54,6 +56,7 @@ function speakBrowser(text, name) {
 // ── Cloud (Google) TTS ──────────────────────────────────────────────────────
 let ttsConfig = null; // { configured, voices: [{id,label,group}] }
 let audioEl = null;
+let endResolve = null; // resolver for the in-flight speak() — let stopSpeaking() unblock it
 
 async function authToken() {
   const { data } = await supabase.auth.getSession();
@@ -84,13 +87,21 @@ async function speakCloud(text, id) {
   if (!audioEl) audioEl = new Audio();
   audioEl.src = `data:audio/mp3;base64,${data.audio}`;
   await audioEl.play();
-  await new Promise((resolve) => { audioEl.onended = resolve; audioEl.onerror = resolve; });
+  await new Promise((resolve) => {
+    const finish = () => { if (endResolve === finish) endResolve = null; resolve(); };
+    endResolve = finish;
+    audioEl.onended = finish;
+    audioEl.onerror = finish;
+  });
 }
 
-// Stop any in-progress speech (cloud audio or browser synthesis).
+// Stop any in-progress speech (cloud audio or browser synthesis), and unblock
+// whatever is awaiting it (otherwise an interrupt leaves the turn hanging on
+// "thinking…" forever, because a paused audio never fires `ended`).
 export function stopSpeaking() {
   if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   if (audioEl) { try { audioEl.pause(); audioEl.currentTime = 0; } catch { /* noop */ } }
+  if (endResolve) { const r = endResolve; endResolve = null; r(); }
 }
 
 // Strip Markdown / code so the assistant never reads symbols aloud.
