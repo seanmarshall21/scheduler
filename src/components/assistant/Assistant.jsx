@@ -95,7 +95,7 @@ export default function Assistant({ onClose, voiceFirst = false }) {
       today: isoDay(Date.now()),
       members: members.map((m) => ({ id: m.id, name: m.name })),
       schedule: entries.slice(0, 80),
-      tasks: (tasks || []).filter((t) => !t.done).map((t) => ({ title: t.title, who: t.assigned_to ? nameOf(t.assigned_to) : 'anyone', due: t.due_date || null })),
+      tasks: (tasks || []).filter((t) => !t.done).map((t) => ({ id: t.id, title: t.title, who: t.assigned_to ? nameOf(t.assigned_to) : 'anyone', due: t.due_date || null })),
       lists: (notes || []).filter((n) => n.kind === 'list').map((n) => ({ note_id: n.id, title: n.title, items: (n.items || []).map((i) => i.text) })),
     };
   };

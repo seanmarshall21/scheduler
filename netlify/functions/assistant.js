@@ -48,6 +48,30 @@ const TOOLS = [
     },
   },
   {
+    name: 'complete_task',
+    description: 'Mark a task as done/complete. Use the task_id from the open tasks context.',
+    input_schema: { type: 'object', properties: { task_id: { type: 'string' } }, required: ['task_id'] },
+  },
+  {
+    name: 'update_task',
+    description: 'Change an existing task: reassign (assigned_to = member id), reschedule (due_date YYYY-MM-DD), or rename (title). Use the task_id from context.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        assigned_to: { type: 'string', description: 'member id, or "anyone"' },
+        due_date: { type: 'string', description: 'YYYY-MM-DD' },
+        title: { type: 'string' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'delete_task',
+    description: 'Delete a task entirely. Use the task_id from context. Confirm only if ambiguous.',
+    input_schema: { type: 'object', properties: { task_id: { type: 'string' } }, required: ['task_id'] },
+  },
+  {
     name: 'add_list_item',
     description: 'Add an item to an existing shared list (use a note_id from the shared lists context).',
     input_schema: {
@@ -90,6 +114,26 @@ async function execTool(supabase, householdId, memberId, name, input) {
     });
     if (error) throw new Error(error.message);
     return `Added event "${input.title}" on ${input.date} at ${input.time}.`;
+  }
+  if (name === 'complete_task') {
+    const { error } = await supabase.from('tasks').update({ done: true, done_at: new Date().toISOString() }).eq('id', input.task_id);
+    if (error) throw new Error(error.message);
+    return 'Marked the task done.';
+  }
+  if (name === 'update_task') {
+    const patch = {};
+    if (input.assigned_to) patch.assigned_to = input.assigned_to === 'anyone' ? null : input.assigned_to;
+    if (input.due_date) patch.due_date = input.due_date;
+    if (input.title) patch.title = input.title;
+    if (!Object.keys(patch).length) return 'Nothing to change.';
+    const { error } = await supabase.from('tasks').update(patch).eq('id', input.task_id);
+    if (error) throw new Error(error.message);
+    return 'Updated the task.';
+  }
+  if (name === 'delete_task') {
+    const { error } = await supabase.from('tasks').delete().eq('id', input.task_id);
+    if (error) throw new Error(error.message);
+    return 'Deleted the task.';
   }
   if (name === 'add_list_item') {
     const { data: note, error: e1 } = await supabase.from('notes').select('items').eq('id', input.note_id).maybeSingle();
@@ -140,7 +184,7 @@ Upcoming schedule: ${JSON.stringify(context.schedule || [])}
 Open tasks: ${JSON.stringify(context.tasks || [])}
 Shared lists (with note ids + items): ${JSON.stringify(context.lists || [])}
 
-Answer questions about the schedule and tasks directly and briefly, reasoning over the data above (e.g. for "is there free time Thursday", look at that day's events). To make changes, call the tools — then confirm what you did in one short sentence. If you don't know who a person is, ask. Don't invent events that aren't in the data. Keep replies short, friendly, and skimmable for a busy kitchen.
+Answer questions about the schedule and tasks directly and briefly, reasoning over the data above (e.g. for "is there free time Thursday", look at that day's events). To make changes, call the tools, then confirm what you did in one short sentence. Each open task includes a task_id — use it to complete_task, update_task (reschedule via due_date, reassign via assigned_to, or rename), or delete_task. Match the task the user means by its title; if two tasks could match, ask which one. If you don't know who a person is, ask. Don't invent events that aren't in the data. Keep replies short, friendly, and skimmable for a busy kitchen.
 
 CRITICAL: Your replies are spoken aloud and shown as chat bubbles. Reply in plain conversational sentences ONLY. Never use Markdown, code blocks, backticks, asterisks, bullet points, numbered lists, headings, or any formatting symbols. If you need to list a few things, say them in a natural sentence ("You've got soccer at 4 and dinner at 6"). Write the way you'd say it out loud.`;
 
