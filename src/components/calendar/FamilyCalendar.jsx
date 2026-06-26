@@ -161,6 +161,7 @@ export default function FamilyCalendar({
   );
   const [anchor, setAnchor] = useState(() => startOfDayTs());
   const [zoom, setZoom] = useState(1);
+  const [agendaMode, setAgendaMode] = useState('time'); // 'time' | 'person' (List view)
   const [editId, setEditId] = useState(null); // raw block id being quick-edited
   const [drag, setDrag] = useState(null);
   const scrollRef = useRef(null);
@@ -267,6 +268,27 @@ export default function FamilyCalendar({
 
   const hours = [];
   for (let m = CAL_START; m <= CAL_END; m += 60) hours.push(m);
+
+  // Compact agenda card used in the per-person columns of List view.
+  const compactItem = (it) => {
+    const color = itemColor(it);
+    const label = it.kind === 'event' ? it.summary : it.raw.title;
+    const clickable = it.kind === 'event' && onEventClick;
+    return (
+      <button
+        key={it.id}
+        onClick={clickable ? () => onEventClick(it.raw) : undefined}
+        className="flex flex-col gap-0.5 rounded-btn border border-surface-3 bg-surface-0 p-2 text-left"
+        style={{ cursor: clickable ? 'pointer' : 'default' }}
+      >
+        <span className="flex items-center gap-1.5">
+          <span className="h-3 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+          <span className="min-w-0 flex-1 truncate text-xs font-bold text-text">{label}</span>
+        </span>
+        <span className="pl-3 font-mono text-[10px] text-text-3">{fmtClock(it.start)} · {durLabel(it.end - it.start)}</span>
+      </button>
+    );
+  };
 
   // ── Pointer drag/resize (mouse + touch) ───────────────────────────────────
   const startGesture = (e, cfg, mode) => {
@@ -421,6 +443,19 @@ export default function FamilyCalendar({
                 </button>
               ))}
             </div>
+            {view === 'agenda' && (
+              <div className="flex rounded-full border border-surface-3 bg-surface-1 p-0.5">
+                {[['time', 'By time'], ['person', 'By person']].map(([k, l]) => (
+                  <button
+                    key={k}
+                    onClick={() => setAgendaMode(k)}
+                    className={`rounded-full px-2 py-1 font-mono text-[10px] uppercase transition-colors ${agendaMode === k ? 'bg-text text-white' : 'text-text-2 hover:text-text'}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            )}
             {TIMED.has(view) && (
               <>
                 <button onClick={() => setZoom((z) => Math.max(0, z - 1))} disabled={zoom === 0} aria-label="Zoom out"
@@ -466,30 +501,61 @@ export default function FamilyCalendar({
                     </span>
                     {isToday && <span className="cd-mono-label" style={{ color: '#e08a3c' }}>today</span>}
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    {day.items.map((it) => {
-                      const color = itemColor(it);
-                      const m = memberById.get(it.member_id);
-                      const label = it.kind === 'event' ? it.summary : it.raw.title;
-                      const clickable = it.kind === 'event' && onEventClick;
-                      return (
-                        <button
-                          key={it.id}
-                          onClick={clickable ? () => onEventClick(it.raw) : undefined}
-                          className="flex items-center gap-3 rounded-btn border border-surface-3 bg-surface-0 p-2.5 text-left"
-                          style={{ cursor: clickable ? 'pointer' : 'default' }}
-                        >
-                          <span className="w-24 shrink-0 font-mono text-[10px] text-text-2">{fmtClock(it.start)}–{fmtClock(it.end)}</span>
-                          <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-bold text-text">{label}</span>
-                            <span className="font-mono text-[10px] text-text-3">{durLabel(it.end - it.start)}</span>
-                          </span>
-                          {m && <MemberChip member={m} size={24} />}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {agendaMode === 'person' ? (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {shown.map((m) => {
+                        const mine = day.items.filter((it) => it.member_id === m.id);
+                        return (
+                          <div key={m.id} className="w-44 shrink-0">
+                            <div className="mb-1 flex items-center gap-1.5">
+                              <MemberChip member={m} size={20} />
+                              <span className="truncate text-xs font-bold text-text">{m.name}</span>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {!mine.length && <p className="py-2 text-center font-mono text-[10px] text-text-3">—</p>}
+                              {mine.map((it) => compactItem(it))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {day.items.some((it) => it.member_id == null) && (
+                        <div className="w-44 shrink-0">
+                          <div className="mb-1 flex items-center gap-1.5">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-squircle bg-surface-3 text-[10px] font-bold text-text-2">·</span>
+                            <span className="truncate text-xs font-bold text-text-2">Shared</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {day.items.filter((it) => it.member_id == null).map((it) => compactItem(it))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {day.items.map((it) => {
+                        const color = itemColor(it);
+                        const m = memberById.get(it.member_id);
+                        const label = it.kind === 'event' ? it.summary : it.raw.title;
+                        const clickable = it.kind === 'event' && onEventClick;
+                        return (
+                          <button
+                            key={it.id}
+                            onClick={clickable ? () => onEventClick(it.raw) : undefined}
+                            className="flex items-center gap-3 rounded-btn border border-surface-3 bg-surface-0 p-2.5 text-left"
+                            style={{ cursor: clickable ? 'pointer' : 'default' }}
+                          >
+                            <span className="w-24 shrink-0 font-mono text-[10px] text-text-2">{fmtClock(it.start)}–{fmtClock(it.end)}</span>
+                            <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-bold text-text">{label}</span>
+                              <span className="font-mono text-[10px] text-text-3">{durLabel(it.end - it.start)}</span>
+                            </span>
+                            {m && <MemberChip member={m} size={24} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
