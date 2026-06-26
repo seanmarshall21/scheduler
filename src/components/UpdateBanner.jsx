@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { X } from 'lucide-react';
 
@@ -16,6 +17,20 @@ export default function UpdateBanner() {
       if (r) setInterval(() => r.update(), CHECK_EVERY_MS);
     },
   });
+  const [busy, setBusy] = useState(false);
+
+  // Activate the waiting worker and reload. updateServiceWorker(true) normally
+  // reloads on `controllerchange`, but if that doesn't fire (no waiting worker
+  // at that instant), force a reload so the button never feels dead.
+  const doUpdate = async () => {
+    setBusy(true);
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      reg?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+      await updateServiceWorker(true);
+    } catch { /* ignore */ }
+    setTimeout(() => window.location.reload(), 1500);
+  };
 
   if (!needRefresh) return null;
 
@@ -24,12 +39,13 @@ export default function UpdateBanner() {
       <div className="flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-[#e0b07c] bg-gradient-to-r from-[#f7dcab] to-[#e9a44d] px-4 py-3 shadow-xl">
         <div className="min-w-0">
           <p className="text-sm font-extrabold uppercase tracking-wide text-text">New stuff!</p>
-          <p className="truncate text-xs text-text-2">Updated version available</p>
+          <p className="truncate text-xs text-text-2">{busy ? 'Updating…' : 'Updated version available'}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={() => updateServiceWorker(true)}
-            className="rounded-full bg-text px-4 py-2 text-sm font-bold text-white transition-transform hover:scale-105"
+            onClick={doUpdate}
+            disabled={busy}
+            className="rounded-full bg-text px-4 py-2 text-sm font-bold text-white transition-transform hover:scale-105 disabled:opacity-70"
           >
             Update
           </button>
