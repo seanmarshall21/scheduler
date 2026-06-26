@@ -31,6 +31,15 @@ export async function pullPrefs() {
     for (const k of SYNC_KEYS) {
       if (prefs[k] != null) ls.setItem(k, String(prefs[k]));
     }
+    // No cloud copy yet → seed it from this device's current settings, so the
+    // first device to load (your computer) populates the account.
+    if (!data) {
+      const seed = {};
+      for (const k of SYNC_KEYS) { const v = ls.getItem(k); if (v != null) seed[k] = v; }
+      if (Object.keys(seed).length) {
+        await supabase.from('user_prefs').upsert({ user_id: uid, prefs: seed, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      }
+    }
     // Let mounted components pick up the synced values.
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('commons:prefs-synced'));
   } catch { /* ignore */ } finally {
