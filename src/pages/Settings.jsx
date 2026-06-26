@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Trash2, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -9,6 +9,7 @@ import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
 import { onVoicesReady, speak, usableVoices, ttsStatus, getVoiceSel, setVoiceSel } from '../lib/speech';
 import { getVoicePrefs, setVoicePref, START_OPTIONS, PAUSE_OPTIONS, BARGE_OPTIONS, keyLabel } from '../lib/voicePrefs';
+import { downscaleImage } from '../lib/image';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -17,6 +18,16 @@ export default function Settings() {
   const { household, activeMemberId } = useApp();
   const { signOut } = useAuth();
   const { members, addMember, updateMember, deactivateMember } = useMembers();
+  const [avatarTarget, setAvatarTarget] = useState(null);
+  const avatarInput = useRef(null);
+  const pickAvatar = (id) => { setAvatarTarget(id); setTimeout(() => avatarInput.current?.click(), 0); };
+  const onAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !avatarTarget) return;
+    try { await updateMember(avatarTarget, { avatar_url: await downscaleImage(file, 256, 0.82) }); } catch { /* ignore */ }
+    setAvatarTarget(null);
+  };
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(PALETTE[0]);
 
@@ -119,10 +130,20 @@ export default function Settings() {
       {/* Members */}
       <section className="cd-card flex flex-col gap-3">
         <h2 className="text-base font-bold text-text">Members</h2>
+        <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={onAvatarFile} />
         <div className="flex flex-col gap-2">
           {members.map((m) => (
             <div key={m.id} className="flex items-center gap-3 rounded-btn border border-surface-3 p-2">
-              <MemberChip member={m} size={36} />
+              <span className="relative shrink-0 cursor-pointer" onClick={() => pickAvatar(m.id)} title="Change photo">
+                <MemberChip member={m} size={36} />
+                {m.avatar_url && (
+                  <span
+                    onClick={(e) => { e.stopPropagation(); updateMember(m.id, { avatar_url: null }); }}
+                    className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-text text-[10px] leading-none text-white"
+                    title="Remove photo"
+                  >×</span>
+                )}
+              </span>
               <input
                 defaultValue={m.name}
                 onBlur={(e) => e.target.value !== m.name && updateMember(m.id, { name: e.target.value })}

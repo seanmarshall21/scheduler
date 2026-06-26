@@ -16,7 +16,13 @@ export default function MemberChip({ member, size = 40, ring = false, className 
       title={member.name}
     >
       {member.avatar_url ? (
-        <img src={member.avatar_url} alt={member.name} className="h-full w-full rounded-squircle object-cover" />
+        // Inset slightly so the member color shows as a ring/stroke around the photo.
+        <img
+          src={member.avatar_url}
+          alt={member.name}
+          className="rounded-squircle object-cover"
+          style={{ width: Math.max(8, size - Math.max(3, size * 0.12)), height: Math.max(8, size - Math.max(3, size * 0.12)) }}
+        />
       ) : (
         initial
       )}
