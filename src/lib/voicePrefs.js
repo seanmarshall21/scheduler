@@ -6,6 +6,8 @@ const K = {
   pauseMs: 'commons.assistant.pauseMs', // silence before auto-send (listen mode)
   bargeIn: 'commons.assistant.bargeIn', // 'off' | 'relaxed' | 'sensitive' — interrupt while it talks
 };
+import { pushPref } from './prefsSync';
+
 const ls = typeof localStorage !== 'undefined' ? localStorage : null;
 
 export const VOICE_DEFAULTS = { startMode: 'listen', pttKey: 'Space', pttKeyLabel: 'Space', pauseMs: 1200, bargeIn: 'relaxed' };
@@ -45,6 +47,7 @@ export function getVoicePrefs() {
 export function setVoicePref(name, value) {
   if (!ls || !K[name]) return;
   ls.setItem(K[name], String(value));
+  pushPref(K[name], value); // follow the account across devices
 }
 
 // Friendly label for a KeyboardEvent.code.

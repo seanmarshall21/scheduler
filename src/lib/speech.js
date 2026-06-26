@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { pushPref } from './prefsSync';
 
 // Spoken replies for the assistant. Two voice sources:
 //   • Google Cloud TTS (lifelike) — when the server has GOOGLE_TTS_API_KEY.
@@ -35,6 +36,7 @@ export function getVoiceSel() {
 }
 export function setVoiceSel(val) {
   if (typeof localStorage !== 'undefined') localStorage.setItem(SEL_KEY, val || '');
+  pushPref(SEL_KEY, val || '');
 }
 
 function speakBrowser(text, name) {

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { pullPrefs } from '../lib/prefsSync';
 
 // Household + members + the "active member" (who am I) for this device.
 //
@@ -73,6 +74,12 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!authLoading) load();
   }, [authLoading, load]);
+
+  // Pull account-synced preferences (assistant voice + voice input) so they
+  // follow the user across devices.
+  useEffect(() => {
+    if (user) pullPrefs();
+  }, [user]);
 
   const setActiveMember = useCallback((id) => {
     setActiveMemberIdState(id);

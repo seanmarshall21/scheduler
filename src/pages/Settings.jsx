@@ -67,6 +67,10 @@ export default function Settings() {
   useEffect(() => {
     onVoicesReady(setVoices);
     ttsStatus().then(setTts);
+    // Refresh when account-synced prefs arrive from another device.
+    const onSynced = () => { setVp(getVoicePrefs()); setVoiceSelState(getVoiceSel()); };
+    window.addEventListener('commons:prefs-synced', onSynced);
+    return () => window.removeEventListener('commons:prefs-synced', onSynced);
   }, []);
 
   useEffect(() => {
