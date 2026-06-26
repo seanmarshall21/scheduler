@@ -10,6 +10,8 @@ import { useCalendars } from '../hooks/useCalendars';
 import { onVoicesReady, speak, usableVoices, ttsStatus, getVoiceSel, setVoiceSel } from '../lib/speech';
 import { getVoicePrefs, setVoicePref, START_OPTIONS, PAUSE_OPTIONS, BARGE_OPTIONS, keyLabel } from '../lib/voicePrefs';
 import { downscaleImage } from '../lib/image';
+import { useReminders } from '../hooks/useReminders';
+import { REMINDER_SPEAK_KEY } from '../components/ReminderWatcher';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -34,6 +36,12 @@ export default function Settings() {
   const gcal = useGoogleCalendar();
   const work = useWorkSchedule();
   const cal = useCalendars(household?.id);
+  const rem = useReminders(household?.id);
+  const notifSupported = typeof Notification !== 'undefined';
+  const [notifPerm, setNotifPerm] = useState(notifSupported ? Notification.permission : 'denied');
+  const requestNotif = async () => { try { setNotifPerm(await Notification.requestPermission()); } catch { /* ignore */ } };
+  const [speakRem, setSpeakRem] = useState(() => typeof localStorage === 'undefined' || localStorage.getItem(REMINDER_SPEAK_KEY) !== '0');
+  const toggleSpeakRem = (on) => { setSpeakRem(on); localStorage.setItem(REMINDER_SPEAK_KEY, on ? '1' : '0'); };
   const [newCalName, setNewCalName] = useState('');
   const [voices, setVoices] = useState([]);
   const [tts, setTts] = useState(null);
@@ -478,6 +486,40 @@ export default function Settings() {
           )}
         </section>
       )}
+
+      {/* Reminders */}
+      <section className="cd-card flex flex-col gap-3">
+        <div>
+          <h2 className="text-base font-bold text-text">Reminders</h2>
+          <p className="mt-1 text-sm text-text-2">Ask the assistant to “remind me…”. They alert here (and aloud) while Commons is open.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {notifSupported && (
+            <button onClick={requestNotif} disabled={notifPerm === 'granted'} className="cd-btn cd-btn--secondary text-sm disabled:opacity-60">
+              {notifPerm === 'granted' ? '✓ Notifications on' : 'Enable notifications'}
+            </button>
+          )}
+          <label className="flex items-center gap-2 text-sm text-text">
+            <input type="checkbox" checked={speakRem} onChange={(e) => toggleSpeakRem(e.target.checked)} className="h-4 w-4" />
+            Speak reminders aloud
+          </label>
+        </div>
+        {rem.reminders.filter((r) => !r.fired).length ? (
+          <div className="flex flex-col gap-1.5">
+            {rem.reminders.filter((r) => !r.fired).map((r) => (
+              <div key={r.id} className="flex items-center gap-3 rounded-btn border border-surface-3 p-2">
+                <span className="w-28 shrink-0 font-mono text-[10px] text-text-2">
+                  {new Date(r.remind_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-text">{r.text}</span>
+                <button onClick={() => rem.removeReminder(r.id)} aria-label="Delete reminder" className="text-text-3 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-text-2">No upcoming reminders.</p>
+        )}
+      </section>
 
       <button onClick={signOut} className="cd-btn cd-btn--ghost self-start">Sign out</button>
     </div>

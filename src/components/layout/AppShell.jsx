@@ -7,6 +7,7 @@ import MemberSwitcher from '../members/MemberSwitcher';
 import Walkthrough from '../Walkthrough';
 import WhiteboardPreview from '../fridge/WhiteboardPreview';
 import Assistant from '../assistant/Assistant';
+import ReminderWatcher from '../ReminderWatcher';
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -57,7 +58,7 @@ export default function AppShell() {
 
   const steps = [
     ...(TOURS[pathname] || GENERIC),
-    { selector: '[data-tour="ask"]', title: 'Ask Commons', body: 'Your assistant. Tap it and just start talking — ask “anything Thursday?” or say “add milk to the groceries.” Prefer typing? Tap “Type instead.”' },
+    { selector: '[data-tour="ask"]', title: 'Ask Commons', body: 'Your assistant. Tap it and just start talking — ask “anything Thursday?”, say “add milk to the groceries,” or “remind me to leave at 5.” Prefer typing? Tap “Type instead.”' },
   ];
 
   // Fridge sign-in alert: pop the whiteboard once per app load if it changed.
@@ -157,6 +158,7 @@ export default function AppShell() {
         <Sparkles className="h-6 w-6" />
       </button>
       {assistantOpen && <Assistant voiceFirst onClose={() => setAssistantOpen(false)} />}
+      <ReminderWatcher />
     </div>
   );
 }

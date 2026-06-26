@@ -81,6 +81,19 @@ const TOOLS = [
     },
   },
   {
+    name: 'add_reminder',
+    description: 'Set a reminder that alerts the household at a time. Compute remind_at as a full ISO 8601 datetime from the user phrasing using the current time provided (e.g. "in 10 minutes", "at 5pm", "tomorrow at 8am"). Optionally for one member.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'what to remind about' },
+        remind_at: { type: 'string', description: 'ISO 8601 datetime when to fire' },
+        member_id: { type: 'string', description: 'who it is for, or omit for everyone' },
+      },
+      required: ['text', 'remind_at'],
+    },
+  },
+  {
     name: 'add_note',
     description: 'Create a new note or a new shared list.',
     input_schema: {
@@ -144,6 +157,14 @@ async function execTool(supabase, householdId, memberId, name, input) {
     if (error) throw new Error(error.message);
     return `Added "${input.text}" to the list.`;
   }
+  if (name === 'add_reminder') {
+    const { error } = await supabase.from('reminders').insert({
+      household_id: householdId, text: input.text, remind_at: input.remind_at,
+      member_id: input.member_id || null, created_by: memberId || null,
+    });
+    if (error) throw new Error(error.message);
+    return `Reminder set for ${new Date(input.remind_at).toLocaleString()}: "${input.text}".`;
+  }
   if (name === 'add_note') {
     const { error } = await supabase.from('notes').insert({
       household_id: householdId, kind: input.kind || 'note', title: input.title || null,
@@ -177,14 +198,14 @@ export const handler = async (event) => {
   const householdId = context.householdId;
   const memberId = context.activeMemberId || null;
 
-  const system = `You are Commons, a warm and concise household assistant on a kitchen wall screen and on phones. Today is ${context.today}. You help the household coordinate their shared calendar, tasks, and notes.
+  const system = `You are Commons, a warm and concise household assistant on a kitchen wall screen and on phones. Today is ${context.today}. The current time is ${context.now || 'unknown'}. You help the household coordinate their shared calendar, tasks, notes, and reminders.
 
 Members (use these ids in tools): ${JSON.stringify(context.members || [])}
 Upcoming schedule: ${JSON.stringify(context.schedule || [])}
 Open tasks: ${JSON.stringify(context.tasks || [])}
 Shared lists (with note ids + items): ${JSON.stringify(context.lists || [])}
 
-Answer questions about the schedule and tasks directly and briefly, reasoning over the data above (e.g. for "is there free time Thursday", look at that day's events). To make changes, call the tools, then confirm what you did in one short sentence. Each open task includes a task_id — use it to complete_task, update_task (reschedule via due_date, reassign via assigned_to, or rename), or delete_task. Match the task the user means by its title; if two tasks could match, ask which one. If you don't know who a person is, ask. Don't invent events that aren't in the data. Keep replies short, friendly, and skimmable for a busy kitchen.
+Answer questions about the schedule and tasks directly and briefly, reasoning over the data above (e.g. for "is there free time Thursday", look at that day's events). To make changes, call the tools, then confirm what you did in one short sentence. Each open task includes a task_id — use it to complete_task, update_task (reschedule via due_date, reassign via assigned_to, or rename), or delete_task. Match the task the user means by its title; if two tasks could match, ask which one. For "remind me…" requests, call add_reminder with the text and an ISO 8601 remind_at you compute from the current time above. If you don't know who a person is, ask. Don't invent events that aren't in the data. Keep replies short, friendly, and skimmable for a busy kitchen.
 
 CRITICAL: Your replies are spoken aloud and shown as chat bubbles. Reply in plain conversational sentences ONLY. Never use Markdown, code blocks, backticks, asterisks, bullet points, numbered lists, headings, or any formatting symbols. If you need to list a few things, say them in a natural sentence ("You've got soccer at 4 and dinner at 6"). Write the way you'd say it out loud.`;
 

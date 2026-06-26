@@ -93,6 +93,7 @@ export default function Assistant({ onClose, voiceFirst = false }) {
       householdId: household?.id,
       activeMemberId,
       today: isoDay(Date.now()),
+      now: new Date().toISOString(),
       members: members.map((m) => ({ id: m.id, name: m.name })),
       schedule: entries.slice(0, 80),
       tasks: (tasks || []).filter((t) => !t.done).map((t) => ({ id: t.id, title: t.title, who: t.assigned_to ? nameOf(t.assigned_to) : 'anyone', due: t.due_date || null })),
