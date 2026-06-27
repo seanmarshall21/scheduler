@@ -10,16 +10,15 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'prompt',
       injectRegister: null,
       manifest: false,
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/\.netlify\//],
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: false,
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
     }),
   ],

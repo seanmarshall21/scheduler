@@ -12,6 +12,7 @@ import { getVoicePrefs, setVoicePref, START_OPTIONS, PAUSE_OPTIONS, BARGE_OPTION
 import { downscaleImage } from '../lib/image';
 import { useReminders } from '../hooks/useReminders';
 import { REMINDER_SPEAK_KEY } from '../components/ReminderWatcher';
+import { pushSupported, pushConfigured, pushStatus, enablePush, disablePush } from '../lib/push';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -42,6 +43,17 @@ export default function Settings() {
   const requestNotif = async () => { try { setNotifPerm(await Notification.requestPermission()); } catch { /* ignore */ } };
   const [speakRem, setSpeakRem] = useState(() => typeof localStorage === 'undefined' || localStorage.getItem(REMINDER_SPEAK_KEY) !== '0');
   const toggleSpeakRem = (on) => { setSpeakRem(on); localStorage.setItem(REMINDER_SPEAK_KEY, on ? '1' : '0'); };
+  const [push, setPush] = useState('off');
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => { pushStatus().then(setPush); }, []);
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      setPush(push === 'on' ? await disablePush() : await enablePush(household?.id));
+      if (push !== 'on') setNotifPerm('granted');
+    } catch (e) { window.alert(e.message); }
+    setPushBusy(false);
+  };
   const [newCalName, setNewCalName] = useState('');
   const [voices, setVoices] = useState([]);
   const [tts, setTts] = useState(null);
@@ -494,16 +506,21 @@ export default function Settings() {
           <p className="mt-1 text-sm text-text-2">Ask the assistant to “remind me…”. They alert here (and aloud) while Commons is open.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {notifSupported && (
+          {pushSupported() && pushConfigured() ? (
+            <button onClick={togglePush} disabled={pushBusy} className="cd-btn cd-btn--secondary text-sm disabled:opacity-60">
+              {push === 'on' ? '✓ Background reminders on' : 'Enable background reminders'}
+            </button>
+          ) : notifSupported ? (
             <button onClick={requestNotif} disabled={notifPerm === 'granted'} className="cd-btn cd-btn--secondary text-sm disabled:opacity-60">
               {notifPerm === 'granted' ? '✓ Notifications on' : 'Enable notifications'}
             </button>
-          )}
+          ) : null}
           <label className="flex items-center gap-2 text-sm text-text">
             <input type="checkbox" checked={speakRem} onChange={(e) => toggleSpeakRem(e.target.checked)} className="h-4 w-4" />
             Speak reminders aloud
           </label>
         </div>
+        <p className="text-xs text-text-3">“Background reminders” delivers a push even when Commons is fully closed (allow notifications when asked). This device included.</p>
         {rem.reminders.filter((r) => !r.fired).length ? (
           <div className="flex flex-col gap-1.5">
             {rem.reminders.filter((r) => !r.fired).map((r) => (
