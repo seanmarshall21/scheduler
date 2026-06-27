@@ -55,19 +55,33 @@ export function useScheduleBlocks(householdId) {
 
   const addBlock = useCallback(
     async (row) => {
-      const tempId = `temp-${++tempSeq}`;
-      const optimistic = { id: tempId, household_id: householdId, minutes: 60, start_min: null, ...row };
-      setAll([...(cache.blocks ?? []), optimistic]);
-      const { data, error } = await supabase
-        .from('schedule_blocks')
-        .insert({ household_id: householdId, ...row })
-        .select()
-        .single();
-      if (error) {
-        setAll((cache.blocks ?? []).filter((b) => b.id !== tempId));
-        throw error;
+      // `member_ids` (multi-person) → one linked row per member, shared group_id.
+      const { member_ids, ...rest } = row;
+      const ids = Array.isArray(member_ids) && member_ids.length ? member_ids : [rest.member_id ?? null];
+
+      if (ids.length <= 1) {
+        const single = { ...rest, member_id: ids[0] ?? rest.member_id ?? null };
+        const tempId = `temp-${++tempSeq}`;
+        const optimistic = { id: tempId, household_id: householdId, minutes: 60, start_min: null, ...single };
+        setAll([...(cache.blocks ?? []), optimistic]);
+        const { data, error } = await supabase
+          .from('schedule_blocks')
+          .insert({ household_id: householdId, ...single })
+          .select()
+          .single();
+        if (error) { setAll((cache.blocks ?? []).filter((b) => b.id !== tempId)); throw error; }
+        setAll((cache.blocks ?? []).map((b) => (b.id === tempId ? data : b)));
+        return data;
       }
-      setAll((cache.blocks ?? []).map((b) => (b.id === tempId ? data : b)));
+
+      const groupId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `g-${Date.now()}-${++tempSeq}`;
+      const rows = ids.map((mid) => ({ household_id: householdId, ...rest, member_id: mid, group_id: groupId }));
+      const optimistic = rows.map((r) => ({ id: `temp-${++tempSeq}`, minutes: 60, start_min: null, ...r }));
+      const optIds = new Set(optimistic.map((o) => o.id));
+      setAll([...(cache.blocks ?? []), ...optimistic]);
+      const { data, error } = await supabase.from('schedule_blocks').insert(rows).select();
+      if (error) { setAll((cache.blocks ?? []).filter((b) => !optIds.has(b.id))); throw error; }
+      setAll([...(cache.blocks ?? []).filter((b) => !optIds.has(b.id)), ...(data ?? [])]);
       return data;
     },
     [householdId]
@@ -88,8 +102,11 @@ export function useScheduleBlocks(householdId) {
 
   const removeBlock = useCallback(async (id) => {
     const prev = cache.blocks ?? [];
-    setAll(prev.filter((b) => b.id !== id));
-    const { error } = await supabase.from('schedule_blocks').delete().eq('id', id);
+    const gid = prev.find((b) => b.id === id)?.group_id || null; // joint block → remove the whole group
+    const removeIds = new Set((gid ? prev.filter((b) => b.group_id === gid) : prev.filter((b) => b.id === id)).map((b) => b.id));
+    setAll(prev.filter((b) => !removeIds.has(b.id)));
+    const del = supabase.from('schedule_blocks').delete();
+    const { error } = gid ? await del.eq('group_id', gid) : await del.eq('id', id);
     if (error) {
       setAll(prev);
       throw error;

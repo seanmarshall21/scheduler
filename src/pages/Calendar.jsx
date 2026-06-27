@@ -29,13 +29,17 @@ const rruleFor = (repeat, until) => {
 
 function AddBlockSheet({ seed, members, defaultMemberId, onClose, onSave }) {
   const [title, setTitle] = useState('');
-  const [memberId, setMemberId] = useState(seed.member_id || defaultMemberId || members[0]?.id || null);
+  const [memberIds, setMemberIds] = useState(() => {
+    const init = seed.member_id || defaultMemberId || members[0]?.id || null;
+    return init ? [init] : [];
+  });
+  const toggleMember = (id) => setMemberIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   const [category, setCategory] = useState('home');
   const [minutes, setMinutes] = useState(60);
 
   const save = () => {
-    if (!title.trim()) return;
-    onSave({ title: title.trim(), member_id: memberId, category, day: seed.day, start_min: seed.start_min, minutes });
+    if (!title.trim() || !memberIds.length) return;
+    onSave({ title: title.trim(), member_ids: memberIds, category, day: seed.day, start_min: seed.start_min, minutes });
     onClose();
   };
 
@@ -50,15 +54,18 @@ function AddBlockSheet({ seed, members, defaultMemberId, onClose, onSave }) {
           <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Groceries, soccer practice…"
             className="cd-input" onKeyDown={(e) => e.key === 'Enter' && save()} />
           <div>
-            <label className="cd-mono-label">Who</label>
+            <label className="cd-mono-label">Who <span className="text-text-3">· tap multiple for a joint block</span></label>
             <div className="mt-1.5 flex flex-wrap gap-2">
-              {members.map((m) => (
-                <button key={m.id} onClick={() => setMemberId(m.id)}
-                  className={`flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 transition-colors ${memberId === m.id ? 'border-text' : 'border-surface-3'}`}>
-                  <MemberChip member={m} size={24} />
-                  <span className="text-xs font-medium text-text">{m.name}</span>
-                </button>
-              ))}
+              {members.map((m) => {
+                const on = memberIds.includes(m.id);
+                return (
+                  <button key={m.id} onClick={() => toggleMember(m.id)}
+                    className={`flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 transition-colors ${on ? 'border-text bg-surface-1' : 'border-surface-3'}`}>
+                    <MemberChip member={m} size={24} />
+                    <span className="text-xs font-medium text-text">{m.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div>
