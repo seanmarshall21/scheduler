@@ -6,18 +6,20 @@ export const WIDGETS = {
   clock: { title: 'Clock' },
   agenda: { title: 'Today' },
   tasks: { title: 'Tasks' },
+  nudges: { title: 'Heads up' },
   fridge: { title: 'Fridge' },
   notes: { title: 'Notes' },
 };
 
-export const DEFAULT_VISIBLE = ['clock', 'agenda', 'tasks', 'fridge', 'notes'];
+export const DEFAULT_VISIBLE = ['clock', 'nudges', 'agenda', 'tasks', 'fridge', 'notes'];
 
 export const DEFAULT_LAYOUT = {
   lg: [
     { i: 'clock', x: 0, y: 0, w: 7, h: 4, minW: 3, minH: 3 },
-    { i: 'tasks', x: 7, y: 0, w: 5, h: 8, minW: 2, minH: 4 },
+    { i: 'nudges', x: 7, y: 0, w: 5, h: 4, minW: 2, minH: 3 },
+    { i: 'tasks', x: 7, y: 4, w: 5, h: 7, minW: 2, minH: 4 },
     { i: 'agenda', x: 0, y: 4, w: 7, h: 10, minW: 3, minH: 5 },
-    { i: 'fridge', x: 7, y: 8, w: 5, h: 7, minW: 2, minH: 4 },
+    { i: 'fridge', x: 7, y: 11, w: 5, h: 6, minW: 2, minH: 4 },
     { i: 'notes', x: 0, y: 14, w: 7, h: 2, minW: 2, minH: 2 },
   ],
 };

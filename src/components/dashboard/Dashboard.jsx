@@ -8,11 +8,12 @@ import { WIDGETS, DEFAULT_LAYOUT, DEFAULT_VISIBLE, loadDash, saveDash, resetDash
 import ClockWidget from './widgets/ClockWidget';
 import AgendaWidget from './widgets/AgendaWidget';
 import TasksWidget from './widgets/TasksWidget';
+import NudgesWidget from './widgets/NudgesWidget';
 import FridgeWidget from './widgets/FridgeWidget';
 import NotesWidget from './widgets/NotesWidget';
 
 const RGL = WidthProvider(Responsive);
-const RENDER = { clock: ClockWidget, agenda: AgendaWidget, tasks: TasksWidget, fridge: FridgeWidget, notes: NotesWidget };
+const RENDER = { clock: ClockWidget, agenda: AgendaWidget, tasks: TasksWidget, nudges: NudgesWidget, fridge: FridgeWidget, notes: NotesWidget };
 
 // The glanceable, rearrangeable kitchen dashboard. Tap Edit to drag, resize,
 // add or remove widgets; the arrangement is saved per device (and per screen
