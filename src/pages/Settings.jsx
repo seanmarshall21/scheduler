@@ -408,7 +408,7 @@ export default function Settings() {
                 {tts?.configured && Object.entries(
                   (tts.voices || []).reduce((acc, v) => { (acc[v.group] ||= []).push(v); return acc; }, {}),
                 ).map(([group, list]) => (
-                  <optgroup key={group} label={`${group} · Google Cloud`}>
+                  <optgroup key={group} label={group}>
                     {list.map((v) => (<option key={v.id} value={`cloud:${v.id}`}>{v.label}</option>))}
                   </optgroup>
                 ))}
@@ -422,7 +422,7 @@ export default function Settings() {
             </div>
             <p className="text-xs text-text-3">
               {tts?.configured
-                ? 'Google Cloud voices are the most lifelike; browser voices work offline. Tap Test after picking one.'
+                ? 'Cloud voices (ElevenLabs / Google) are the most lifelike; browser voices work offline. Tap Test after picking one.'
                 : "These are your device's built-in voices."}
             </p>
           </>
