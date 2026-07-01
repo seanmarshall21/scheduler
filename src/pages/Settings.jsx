@@ -324,9 +324,12 @@ export default function Settings() {
 
                       {acct.calendars?.length > 0 && (
                         <div className="flex flex-col gap-1.5 border-t border-surface-2 pt-2">
-                          <p className="cd-mono-label">calendars shown</p>
+                          <div className="flex items-center justify-between">
+                            <p className="cd-mono-label">calendars shown</p>
+                            <p className="cd-mono-label">busy?</p>
+                          </div>
                           {acct.calendars.map((cal) => (
-                            <label key={cal.id} className="flex items-center gap-2">
+                            <div key={cal.id} className="flex items-center gap-2">
                               <input
                                 type="checkbox"
                                 checked={cal.enabled !== false}
@@ -334,8 +337,16 @@ export default function Settings() {
                                 className="h-4 w-4 shrink-0"
                               />
                               {cal.color && <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: cal.color }} />}
-                              <span className="truncate text-sm text-text">{cal.name || cal.id}</span>
-                            </label>
+                              <span className="min-w-0 flex-1 truncate text-sm text-text">{cal.name || cal.id}</span>
+                              <button
+                                onClick={() => gcal.setCalendarBusy(acct, cal.id, !cal.busy)}
+                                disabled={Boolean(acct.busyOnly) || cal.enabled === false}
+                                title="Show this calendar as busy time only (hide titles)"
+                                className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase transition-colors disabled:opacity-30 ${(cal.busy || acct.busyOnly) ? 'border-text bg-text text-white' : 'border-surface-3 text-text-2 hover:bg-surface-1'}`}
+                              >
+                                busy
+                              </button>
+                            </div>
                           ))}
                         </div>
                       )}

@@ -79,7 +79,7 @@ export default function AppShell() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Top bar — pinned, full width */}
-      <header data-tour="topbar" className="flex shrink-0 items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
+      <header data-tour="topbar" className="relative z-50 flex shrink-0 items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
         <div className="flex items-center gap-2">
           <img src="/icons/icon.svg" alt="" className="h-7 w-auto" />
           <span className="text-sm font-bold text-text">{household?.name || 'Commons'}</span>

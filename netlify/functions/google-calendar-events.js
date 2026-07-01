@@ -25,10 +25,13 @@ const json = (statusCode, body) => ({
 // Meetings the user has declined shouldn't show as busy time.
 const isDeclined = (e) => (e.attendees || []).some((a) => a.self && a.responseStatus === 'declined');
 
-// Per-calendar on/off lives in the `calendars` jsonb: [{ id, enabled }].
-// A calendar is off only when it's explicitly present with enabled === false.
+// Per-calendar prefs live in the `calendars` jsonb: [{ id, enabled, busy }].
+// A calendar is off only when explicitly enabled === false; `busy` hides its
+// titles (show time only) even when the account isn't fully busy-only.
 const disabledCalIds = (conn) =>
   new Set((Array.isArray(conn.calendars) ? conn.calendars : []).filter((c) => c.enabled === false).map((c) => c.id));
+const busyCalIds = (conn) =>
+  new Set((Array.isArray(conn.calendars) ? conn.calendars : []).filter((c) => c.busy === true).map((c) => c.id));
 
 async function freshAccessToken(supabase, conn) {
   const expiry = conn.token_expiry ? new Date(conn.token_expiry).getTime() : 0;
@@ -108,6 +111,7 @@ export const handler = async (event) => {
       const allCals = (listBody.items || []).filter((c) => c.selected !== false).slice(0, 20);
       // Per-calendar curation: skip the ones switched off in Settings.
       const disabled = disabledCalIds(conn);
+      const busyCals = busyCalIds(conn);
       const calendars = allCals.filter((c) => !disabled.has(c.id));
 
       const perCal = await Promise.all(
@@ -142,12 +146,12 @@ export const handler = async (event) => {
                 // calendar. (If the OAuth scope was read-only, a write attempt
                 // 403s and the write function reports it.)
                 editable: e.organizer?.self !== false && cal.accessRole !== 'reader',
-                // Privacy: busy-only accounts surface time, never titles.
-                summary: conn.busy_only ? 'Busy' : e.summary || 'Busy',
+                // Privacy: busy-only accounts OR per-calendar "busy" surface time, never titles.
+                summary: (conn.busy_only || busyCals.has(cal.id)) ? 'Busy' : e.summary || 'Busy',
                 start: e.start.dateTime || e.start.date,
                 end: e.end?.dateTime || e.end?.date,
                 allDay: Boolean(e.start.date && !e.start.dateTime),
-                calendar: conn.busy_only ? null : cal.summaryOverride || cal.summary,
+                calendar: (conn.busy_only || busyCals.has(cal.id)) ? null : cal.summaryOverride || cal.summary,
                 color: cal.backgroundColor || null,
                 account: conn.google_email,
                 treatment: conn.treatment, // per-account: schedule_around | ask | show
@@ -172,6 +176,7 @@ export const handler = async (event) => {
           name: c.summaryOverride || c.summary,
           color: c.backgroundColor || null,
           enabled: !disabled.has(c.id),
+          busy: busyCals.has(c.id),
         })),
       });
     } catch {

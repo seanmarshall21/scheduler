@@ -135,18 +135,19 @@ export function useGoogleCalendar() {
     [load]
   );
 
-  // Persist a per-calendar on/off into the `calendars` jsonb ([{ id, enabled }]).
-  const setCalendarEnabled = useCallback(
-    async (account, calId, enabled) => {
-      const next = (account.calendars || []).map((c) =>
-        c.id === calId ? { id: c.id, enabled } : { id: c.id, enabled: c.enabled !== false }
-      );
-      if (!next.some((c) => c.id === calId)) next.push({ id: calId, enabled });
+  // Persist per-calendar prefs into the `calendars` jsonb ([{ id, enabled, busy }]).
+  const writeCalendars = useCallback(
+    async (account, calId, patch) => {
+      const base = (account.calendars || []).map((c) => ({ id: c.id, enabled: c.enabled !== false, busy: Boolean(c.busy) }));
+      const next = base.map((c) => (c.id === calId ? { ...c, ...patch } : c));
+      if (!next.some((c) => c.id === calId)) next.push({ id: calId, enabled: true, busy: false, ...patch });
       await supabase.from('google_connections').update({ calendars: next }).eq('id', account.connId);
       await load();
     },
     [load]
   );
+  const setCalendarEnabled = useCallback((account, calId, enabled) => writeCalendars(account, calId, { enabled }), [writeCalendars]);
+  const setCalendarBusy = useCallback((account, calId, busy) => writeCalendars(account, calId, { busy }), [writeCalendars]);
 
   const disconnect = useCallback(
     async (connId) => {
@@ -182,6 +183,7 @@ export function useGoogleCalendar() {
     exchangeCode,
     setBusyOnly,
     setCalendarEnabled,
+    setCalendarBusy,
     disconnect,
     createGoogleEvent,
     reload: load,
