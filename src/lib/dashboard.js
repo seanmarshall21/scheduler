@@ -24,23 +24,38 @@ export const DEFAULT_LAYOUT = {
   ],
 };
 
-const keyFor = (hid) => `commons.dashboard.${hid || 'default'}`;
+// v2: multiple NAMED layouts per device, { activeId, presets: [{id,name,layouts,visible}] }.
+const uid = () => `p-${Math.random().toString(36).slice(2, 8)}`;
+const V2_KEY = (hid) => `commons.dashboard.v2.${hid || 'default'}`;
+const OLD_KEY = (hid) => `commons.dashboard.${hid || 'default'}`;
 
-export function loadDash(hid) {
+export function newPreset(name, base) {
+  return {
+    id: uid(),
+    name: name || 'Layout',
+    layouts: base?.layouts || DEFAULT_LAYOUT,
+    visible: base?.visible || DEFAULT_VISIBLE,
+  };
+}
+
+export function loadPresets(hid) {
   try {
-    const raw = localStorage.getItem(keyFor(hid));
+    const raw = localStorage.getItem(V2_KEY(hid));
     if (raw) {
       const v = JSON.parse(raw);
-      if (v?.layouts && Array.isArray(v?.visible)) return v;
+      if (Array.isArray(v?.presets) && v.presets.length) return v;
     }
   } catch { /* ignore */ }
-  return { layouts: DEFAULT_LAYOUT, visible: DEFAULT_VISIBLE };
+  // Migrate a v1 single layout if present, else start from the default.
+  let base = { layouts: DEFAULT_LAYOUT, visible: DEFAULT_VISIBLE };
+  try {
+    const old = JSON.parse(localStorage.getItem(OLD_KEY(hid)) || 'null');
+    if (old?.layouts && Array.isArray(old?.visible)) base = { layouts: old.layouts, visible: old.visible };
+  } catch { /* ignore */ }
+  const preset = { id: 'default', name: 'Default', ...base };
+  return { activeId: preset.id, presets: [preset] };
 }
 
-export function saveDash(hid, data) {
-  try { localStorage.setItem(keyFor(hid), JSON.stringify(data)); } catch { /* ignore */ }
-}
-
-export function resetDash(hid) {
-  try { localStorage.removeItem(keyFor(hid)); } catch { /* ignore */ }
+export function savePresets(hid, data) {
+  try { localStorage.setItem(V2_KEY(hid), JSON.stringify(data)); } catch { /* ignore */ }
 }
