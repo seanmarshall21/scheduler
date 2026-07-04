@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from './AppContext';
 import { useNotes } from '../hooks/useNotes';
 import { useTasks } from '../hooks/useTasks';
@@ -14,6 +15,7 @@ const Ctx = createContext({ openCapture: () => {}, scanning: false });
 export const useCapture = () => useContext(Ctx);
 
 export function CaptureProvider({ children }) {
+  const navigate = useNavigate();
   const { household, activeMemberId, members } = useApp();
   const { notes, add, update } = useNotes(household?.id);
   const { addTask } = useTasks(household?.id);
@@ -55,15 +57,23 @@ export function CaptureProvider({ children }) {
     }
   };
 
+  // After creating, take you straight to what you just made.
   const handlers = {
-    createEvent: (row) => addEvent({ ...row, created_by: activeMemberId || null }),
-    createTask: (row) => addTask({ ...row, created_by: activeMemberId || null }),
-    createList: ({ title, items }) => add({ kind: 'list', title, items: mkItems(items), created_by: activeMemberId || null }),
-    appendList: (noteId, items) => {
-      const note = notes.find((n) => n.id === noteId);
-      return update(noteId, { items: [...(note?.items || []), ...mkItems(items)] });
+    createEvent: async (row) => { await addEvent({ ...row, created_by: activeMemberId || null }); navigate('/calendar'); },
+    createTask: async (row) => { await addTask({ ...row, created_by: activeMemberId || null }); navigate('/tasks'); },
+    createList: async ({ title, items }) => {
+      const d = await add({ kind: 'list', title, items: mkItems(items), created_by: activeMemberId || null });
+      navigate('/notes', { state: { focusId: d?.id } });
     },
-    createNote: ({ title, body }) => add({ kind: 'note', title, body, created_by: activeMemberId || null }),
+    appendList: async (noteId, items) => {
+      const note = notes.find((n) => n.id === noteId);
+      await update(noteId, { items: [...(note?.items || []), ...mkItems(items)] });
+      navigate('/notes', { state: { focusId: noteId } });
+    },
+    createNote: async ({ title, body }) => {
+      const d = await add({ kind: 'note', title, body, created_by: activeMemberId || null });
+      navigate('/notes', { state: { focusId: d?.id } });
+    },
   };
 
   return (

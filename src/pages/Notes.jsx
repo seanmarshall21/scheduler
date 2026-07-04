@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Camera, Check, ChevronDown, ChevronRight, ListChecks, Loader2, Pencil, Plus, StickyNote, Trash2, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useNotes } from '../hooks/useNotes';
@@ -12,10 +13,21 @@ export default function Notes() {
   const { notes, add, update, toggleItem, addItem, remove } = useNotes(household?.id);
   const { openCapture, scanning } = useCapture();
   const [draft, setDraft] = useState('');
+  const location = useLocation();
+  const [focusId, setFocusId] = useState(location.state?.focusId || null);
 
-  const addNote = (kind) => {
+  // When a note/list is created (here or via capture), scroll to it + highlight.
+  useEffect(() => { if (location.state?.focusId) setFocusId(location.state.focusId); }, [location.state]);
+  useEffect(() => {
+    if (!focusId) return undefined;
+    const t1 = setTimeout(() => document.getElementById(`note-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+    const t2 = setTimeout(() => setFocusId(null), 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [focusId]);
+
+  const addNote = async (kind) => {
     if (kind === 'note' && !draft.trim()) return;
-    add({
+    const data = await add({
       kind,
       title: kind === 'list' ? draft.trim() || 'New list' : null,
       body: kind === 'note' ? draft.trim() : null,
@@ -23,6 +35,7 @@ export default function Notes() {
       created_by: activeMemberId || null,
     });
     setDraft('');
+    if (data?.id) setFocusId(data.id);
   };
 
   const removeItem = (note, itemId) => update(note.id, { items: (note.items || []).filter((i) => i.id !== itemId) });
@@ -44,7 +57,7 @@ export default function Notes() {
       <div data-tour="note-grid" className="cd-scroll grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {notes.length === 0 && <p className="cd-mono-label col-span-full py-10 text-center">nothing here yet</p>}
         {notes.map((n) => (
-          <div key={n.id} className="cd-card flex flex-col gap-2">
+          <div key={n.id} id={`note-${n.id}`} className={`cd-card flex flex-col gap-2 transition-shadow ${focusId === n.id ? 'ring-2 ring-[#e08a3c]' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               {n.kind === 'list' ? (
                 <input

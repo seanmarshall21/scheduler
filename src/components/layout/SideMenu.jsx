@@ -6,7 +6,7 @@ const ITEMS = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/notes', label: 'Notes', icon: StickyNote },
+  { to: '/notes', label: 'Notes & Lists', icon: StickyNote },
   { to: '/fridge', label: 'The fridge', icon: PenLine },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
