@@ -1,21 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { CalendarDays, CheckSquare, HelpCircle, Home, PenLine, Settings, Sparkles, StickyNote } from 'lucide-react';
+import { CalendarDays, HelpCircle, Home, Menu, Settings, Sparkles, Zap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useWhiteboard } from '../../hooks/useWhiteboard';
+import { CaptureProvider } from '../../context/CaptureContext';
 import MemberSwitcher from '../members/MemberSwitcher';
 import Walkthrough from '../Walkthrough';
 import WhiteboardPreview from '../fridge/WhiteboardPreview';
 import Assistant from '../assistant/Assistant';
 import ReminderWatcher from '../ReminderWatcher';
+import SideMenu from './SideMenu';
+import QuickActions from './QuickActions';
 
-const NAV = [
-  { to: '/', label: 'Home', icon: Home, end: true },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/notes', label: 'Notes', icon: StickyNote },
-  { to: '/settings', label: 'Settings', icon: Settings },
-];
+// Footer tabs that flank the center Quick Actions button.
+function FooterLink({ to, label, icon: Icon, end }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) => `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors md:flex-row md:gap-2 md:px-3 md:text-sm ${isActive ? 'text-text' : 'text-text-3 hover:text-text-2'}`}
+    >
+      {({ isActive }) => (
+        <>
+          <Icon className="h-5 w-5" style={isActive ? { color: '#e08a3c' } : undefined} />
+          {label}
+        </>
+      )}
+    </NavLink>
+  );
+}
 
 // Per-page spotlight steps. Pages without their own steps get GENERIC.
 const TOURS = {
@@ -55,6 +68,8 @@ export default function AppShell() {
   const navigate = useNavigate();
   const [tour, setTour] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [qaOpen, setQaOpen] = useState(false);
 
   const steps = [
     ...(TOURS[pathname] || GENERIC),
@@ -77,22 +92,22 @@ export default function AppShell() {
   };
 
   return (
+    <CaptureProvider>
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Top bar — pinned, full width */}
       <header data-tour="topbar" className="relative z-50 flex shrink-0 items-center justify-between gap-3 border-b border-surface-3 bg-surface-0/80 px-4 py-2.5 pt-safe backdrop-blur">
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMenuOpen(true)}
+            aria-label="Menu"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1 hover:text-text"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
           <img src="/icons/icon.svg" alt="" className="h-7 w-auto" />
           <span className="text-sm font-bold text-text">{household?.name || 'Commons'}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => navigate('/fridge')}
-            aria-label="The fridge"
-            title="The fridge"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1 hover:text-text"
-          >
-            <PenLine className="h-5 w-5" />
-          </button>
           <button
             onClick={() => setTour(true)}
             aria-label="Show me around this page"
@@ -112,24 +127,26 @@ export default function AppShell() {
         <Outlet />
       </main>
 
-      {/* Bottom nav — pinned to the bottom, full width, on every size */}
+      {/* Bottom nav — Home · Calendar · [Quick actions] · Settings · More */}
       <nav data-tour="nav" className="fixed inset-x-0 bottom-0 z-40 flex shrink-0 items-stretch justify-around border-t border-surface-3 bg-surface-0/95 pb-safe backdrop-blur md:static">
-        {NAV.map(({ to, label, icon: Icon, end }) => {
-          const active = end ? pathname === to : pathname.startsWith(to);
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors md:flex-none md:flex-row md:gap-2 md:px-3 md:text-sm ${
-                active ? 'text-text' : 'text-text-3 hover:text-text-2'
-              }`}
-            >
-              <Icon className="h-5 w-5" style={active ? { color: '#e08a3c' } : undefined} />
-              {label}
-            </NavLink>
-          );
-        })}
+        <FooterLink to="/" label="Home" icon={Home} end />
+        <FooterLink to="/calendar" label="Calendar" icon={CalendarDays} />
+        <div className="flex flex-1 items-start justify-center">
+          <button
+            onClick={() => setQaOpen(true)}
+            aria-label="Quick actions"
+            className="-mt-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#e08a3c] text-white shadow-lg transition-transform hover:scale-105"
+          >
+            <Zap className="h-6 w-6" />
+          </button>
+        </div>
+        <FooterLink to="/settings" label="Settings" icon={Settings} />
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium text-text-3 transition-colors hover:text-text-2 md:flex-row md:gap-2 md:px-3 md:text-sm"
+        >
+          <Menu className="h-5 w-5" /> More
+        </button>
       </nav>
 
       {tour && <Walkthrough steps={steps} onClose={() => setTour(false)} />}
@@ -159,6 +176,9 @@ export default function AppShell() {
       </button>
       {assistantOpen && <Assistant voiceFirst onClose={() => setAssistantOpen(false)} />}
       <ReminderWatcher />
+      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <QuickActions open={qaOpen} onClose={() => setQaOpen(false)} onAssistant={() => setAssistantOpen(true)} />
     </div>
+    </CaptureProvider>
   );
 }
