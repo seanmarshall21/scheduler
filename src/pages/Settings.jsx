@@ -13,6 +13,7 @@ import { downscaleImage } from '../lib/image';
 import { useReminders } from '../hooks/useReminders';
 import { REMINDER_SPEAK_KEY } from '../components/ReminderWatcher';
 import { pushSupported, pushConfigured, pushStatus, enablePush, disablePush } from '../lib/push';
+import { getScreensaver, setScreensaver, SAVER_MINUTES } from '../lib/screensaver';
 import MemberChip from '../components/members/MemberChip';
 
 const PALETTE = ['#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c', '#e05c9e', '#3ca6a0', '#7a6f5f'];
@@ -43,6 +44,8 @@ export default function Settings() {
   const requestNotif = async () => { try { setNotifPerm(await Notification.requestPermission()); } catch { /* ignore */ } };
   const [speakRem, setSpeakRem] = useState(() => typeof localStorage === 'undefined' || localStorage.getItem(REMINDER_SPEAK_KEY) !== '0');
   const toggleSpeakRem = (on) => { setSpeakRem(on); localStorage.setItem(REMINDER_SPEAK_KEY, on ? '1' : '0'); };
+  const [saver, setSaver] = useState(getScreensaver);
+  const updSaver = (patch) => { const next = { ...saver, ...patch }; setSaver(next); setScreensaver(next); };
   const [push, setPush] = useState('off');
   const [pushBusy, setPushBusy] = useState(false);
   useEffect(() => { pushStatus().then(setPush); }, []);
@@ -546,6 +549,26 @@ export default function Settings() {
           </div>
         ) : (
           <p className="text-sm text-text-2">No upcoming reminders.</p>
+        )}
+      </section>
+
+      {/* Screen saver (kiosk) */}
+      <section className="cd-card flex flex-col gap-3">
+        <div>
+          <h2 className="text-base font-bold text-text">Screen saver</h2>
+          <p className="mt-1 text-sm text-text-2">For a wall display — after some idle time, show a big clock + today's agenda; tap to wake. Per device.</p>
+        </div>
+        <label className="flex items-center justify-between gap-3 text-sm text-text">
+          <span>Enable on this device</span>
+          <input type="checkbox" checked={saver.enabled} onChange={(e) => updSaver({ enabled: e.target.checked })} className="h-4 w-4 shrink-0" />
+        </label>
+        {saver.enabled && (
+          <label className="flex items-center justify-between gap-3 text-sm text-text">
+            <span>After idle for</span>
+            <select value={saver.minutes} onChange={(e) => updSaver({ minutes: Number(e.target.value) })} className="cd-input !w-auto shrink-0 !py-2">
+              {SAVER_MINUTES.map((n) => (<option key={n} value={n}>{n} min</option>))}
+            </select>
+          </label>
         )}
       </section>
 

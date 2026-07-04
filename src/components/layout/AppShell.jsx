@@ -9,6 +9,7 @@ import Walkthrough from '../Walkthrough';
 import WhiteboardPreview from '../fridge/WhiteboardPreview';
 import Assistant from '../assistant/Assistant';
 import ReminderWatcher from '../ReminderWatcher';
+import Screensaver from '../Screensaver';
 import SideMenu from './SideMenu';
 import QuickActions from './QuickActions';
 
@@ -176,6 +177,7 @@ export default function AppShell() {
       </button>
       {assistantOpen && <Assistant voiceFirst onClose={() => setAssistantOpen(false)} />}
       <ReminderWatcher />
+      <Screensaver />
       <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       <QuickActions open={qaOpen} onClose={() => setQaOpen(false)} onAssistant={() => setAssistantOpen(true)} />
     </div>
