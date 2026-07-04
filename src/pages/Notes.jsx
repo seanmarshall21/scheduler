@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Camera, Check, ListChecks, Loader2, Plus, StickyNote, Trash2, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ChevronRight, ListChecks, Loader2, Pencil, Plus, StickyNote, Trash2, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useNotes } from '../hooks/useNotes';
 import { useCapture } from '../context/CaptureContext';
+import MarkdownView from '../components/notes/MarkdownView';
+import NoteEditor from '../components/notes/NoteEditor';
 
 // Household notes + shared checklists everyone can add to / check off.
 export default function Notes() {
@@ -24,6 +26,8 @@ export default function Notes() {
   };
 
   const removeItem = (note, itemId) => update(note.id, { items: (note.items || []).filter((i) => i.id !== itemId) });
+  const editItem = (note, itemId, text) => update(note.id, { items: (note.items || []).map((i) => (i.id === itemId ? { ...i, text } : i)) });
+  const [editingNoteId, setEditingNoteId] = useState(null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
@@ -51,18 +55,24 @@ export default function Notes() {
               ) : (
                 <span className="cd-mono-label">note</span>
               )}
-              <button onClick={() => remove(n.id)} className="text-text-3 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+              <div className="flex shrink-0 items-center gap-1">
+                {n.kind === 'note' && editingNoteId !== n.id && (
+                  <button onClick={() => setEditingNoteId(n.id)} aria-label="Edit" className="text-text-3 hover:text-text"><Pencil className="h-4 w-4" /></button>
+                )}
+                <button onClick={() => remove(n.id)} className="text-text-3 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+              </div>
             </div>
 
             {n.kind === 'note' ? (
-              <textarea
-                defaultValue={n.body || ''}
-                onBlur={(e) => e.target.value !== n.body && update(n.id, { body: e.target.value })}
-                rows={3}
-                className="w-full resize-none bg-transparent text-sm text-text focus:outline-none"
-              />
+              editingNoteId === n.id ? (
+                <NoteEditor value={n.body || ''} onSave={(body) => { update(n.id, { body }); setEditingNoteId(null); }} onCancel={() => setEditingNoteId(null)} />
+              ) : n.body ? (
+                <MarkdownView>{n.body}</MarkdownView>
+              ) : (
+                <button onClick={() => setEditingNoteId(n.id)} className="text-left text-sm text-text-3">Tap to write…</button>
+              )
             ) : (
-              <ListBody note={n} onToggle={toggleItem} onAdd={addItem} onRemove={removeItem} />
+              <ListBody note={n} onToggle={toggleItem} onAdd={addItem} onRemove={removeItem} onEditItem={editItem} />
             )}
           </div>
         ))}
@@ -88,21 +98,44 @@ const cleanItem = (raw) => (raw || '')
   .replace(/`([^`]+)`/g, '$1')
   .trim();
 
-function ListBody({ note, onToggle, onAdd, onRemove }) {
+const COLLAPSE_KEY = 'commons.list.collapsed';
+const loadCollapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY)) || []); } catch { return new Set(); } };
+const persistCollapsed = (set) => { try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...set])); } catch { /* ignore */ } };
+
+function ListBody({ note, onToggle, onAdd, onRemove, onEditItem }) {
   const [text, setText] = useState('');
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const toggleCollapse = (key) => setCollapsed((s) => {
+    const n = new Set(s);
+    if (n.has(key)) n.delete(key); else n.add(key);
+    persistCollapsed(n);
+    return n;
+  });
+
+  let sectionCollapsed = false; // items after a collapsed header are hidden until the next header
   return (
     <div className="flex flex-col gap-1">
       {(note.items || []).map((it) => {
         const header = headerLabel(it.text);
         if (header) {
+          const key = `${note.id}:${it.id}`;
+          sectionCollapsed = collapsed.has(key);
           return (
-            <div key={it.id} className="mt-2 flex items-center gap-2 first:mt-0">
-              <span className="cd-mono-label whitespace-nowrap">{header}</span>
-              <span className="h-px flex-1 bg-surface-3" />
-              <button onClick={() => onRemove?.(note, it.id)} aria-label="Remove" className="text-text-3/50 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
+            <div key={it.id} className="mt-2 flex items-center gap-1.5 border-b border-surface-3 pb-1 first:mt-0">
+              <button onClick={() => toggleCollapse(key)} aria-label={sectionCollapsed ? 'Expand' : 'Collapse'} className="shrink-0 text-text-3 hover:text-text">
+                {sectionCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              <input
+                key={header}
+                defaultValue={header}
+                onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== header) onEditItem?.(note, it.id, `## ${v}`); }}
+                className="min-w-0 flex-1 bg-transparent text-xs font-bold uppercase tracking-wide text-text-2 focus:outline-none"
+              />
+              <button onClick={() => onRemove?.(note, it.id)} aria-label="Remove" className="shrink-0 text-text-3/50 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
             </div>
           );
         }
+        if (sectionCollapsed) return null;
         return (
           <div key={it.id} className="flex items-center gap-2 rounded-md p-1 hover:bg-surface-1">
             <button onClick={() => onToggle(note, it.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -115,20 +148,20 @@ function ListBody({ note, onToggle, onAdd, onRemove }) {
           </div>
         );
       })}
-      <div className="mt-1 flex items-center gap-1.5">
-        <Plus className="h-3.5 w-3.5 text-text-3" />
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && text.trim()) {
-              onAdd(note, text.trim());
-              setText('');
-            }
-          }}
-          placeholder="add item…"
-          className="flex-1 bg-transparent text-sm text-text placeholder:text-text-3 focus:outline-none"
-        />
+      <div className="mt-1 flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <Plus className="h-3.5 w-3.5 shrink-0 text-text-3" />
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && text.trim()) { onAdd(note, text.trim()); setText(''); }
+            }}
+            placeholder="add item…"
+            className="min-w-0 flex-1 bg-transparent text-sm text-text placeholder:text-text-3 focus:outline-none"
+          />
+        </div>
+        <button onClick={() => onAdd(note, '## New section')} className="shrink-0 font-mono text-[10px] uppercase text-text-3 hover:text-text">+ section</button>
       </div>
     </div>
   );
