@@ -63,7 +63,7 @@ export const handler = async (event) => {
 Classify kind:
 - "event": a plan tied to a date/time (e.g. a text like "dinner Saturday 7pm at Mario's"). Extract date, time, minutes, location, notes.
 - "task": a single actionable to-do, possibly with a deadline → due_date.
-- "list": multiple items to check off (packing, groceries, steps). Extract items[] cleaned, deduped, sensibly grouped/ordered. If it clearly extends an existing list, set listMatch to its exact title.
+- "list": multiple items to check off (packing, groceries, steps). Extract items[] cleaned, deduped, sensibly grouped/ordered. Keep each item as PLAIN text — no bullets, no markdown emphasis. If the list has sections/categories, put each section title as its own item prefixed with "## " (e.g. "## Car items") — these render as dividers, not checkboxes. If it clearly extends an existing list, set listMatch to its exact title.
 - "note": prose/paragraph info worth keeping → organized body.
 Household members: ${members.join(', ') || '(none)'} — if a person is clearly responsible or attending, set "who" to their name. Existing lists: ${listTitles.join(', ') || '(none)'}.
 Resolve relative dates ("this Saturday", "tomorrow") against today into absolute YYYY-MM-DD. Don't invent details that aren't present. Call capture with your single best interpretation.`;
