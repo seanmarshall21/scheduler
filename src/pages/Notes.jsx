@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { Check, ListChecks, Plus, StickyNote, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Camera, Check, ListChecks, Loader2, Plus, StickyNote, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useNotes } from '../hooks/useNotes';
+import { supabase } from '../lib/supabase';
+import { downscaleImage } from '../lib/image';
 
 // Household notes + shared checklists everyone can add to / check off.
 export default function Notes() {
   const { household, activeMemberId } = useApp();
   const { notes, add, update, toggleItem, addItem, remove } = useNotes(household?.id);
   const [draft, setDraft] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const scanInput = useRef(null);
 
   const addNote = (kind) => {
     if (kind === 'note' && !draft.trim()) return;
@@ -21,14 +25,49 @@ export default function Notes() {
     setDraft('');
   };
 
+  // Snap a photo of a handwritten/printed list → clean structured list/note.
+  const onScan = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setScanning(true);
+    try {
+      const image = await downscaleImage(file, 1600, 0.8);
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch('/.netlify/functions/scan-note', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image, kind: 'auto' }),
+      });
+      const out = await res.json();
+      if (out.error) { window.alert(out.error); return; }
+      await add({
+        kind: out.kind,
+        title: out.title,
+        body: out.kind === 'note' ? out.body : null,
+        items: out.kind === 'list' ? (out.items || []).map((text, i) => ({ id: `i-${Date.now()}-${i}`, text, done: false })) : [],
+        created_by: activeMemberId || null,
+      });
+    } catch {
+      window.alert('Scan failed — try again with a clearer photo.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
       <div data-tour="note-add" className="cd-card flex items-center gap-2">
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Jot a note or start a list…"
           className="cd-input flex-1" onKeyDown={(e) => e.key === 'Enter' && addNote('note')} />
+        <input ref={scanInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={onScan} />
+        <button onClick={() => scanInput.current?.click()} disabled={scanning} className="cd-btn cd-btn--secondary shrink-0 disabled:opacity-60" title="Scan a photo of a list or note">
+          {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+        </button>
         <button onClick={() => addNote('note')} className="cd-btn cd-btn--secondary shrink-0" title="Add note"><StickyNote className="h-4 w-4" /></button>
         <button onClick={() => addNote('list')} className="cd-btn cd-btn--accent shrink-0" title="Start list"><ListChecks className="h-4 w-4" /></button>
       </div>
+      {scanning && <p className="cd-mono-label -mt-1 px-1">reading your photo…</p>}
 
       <div data-tour="note-grid" className="cd-scroll grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {notes.length === 0 && <p className="cd-mono-label col-span-full py-10 text-center">nothing here yet</p>}

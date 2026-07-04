@@ -29,7 +29,7 @@ const TOURS = {
     { selector: '[data-tour="task-list"]', title: 'The list', body: 'Check off, reassign, or delete a task. Overdue items turn red.' },
   ],
   '/notes': [
-    { selector: '[data-tour="note-add"]', title: 'Note or list', body: 'Jot a quick note, or start a shared checklist (like groceries) anyone can add to.' },
+    { selector: '[data-tour="note-add"]', title: 'Note or list', body: 'Jot a note, start a shared checklist, or tap the 📷 to snap a photo of a handwritten list and turn it into an organized checklist automatically.' },
     { selector: '[data-tour="note-grid"]', title: 'Your notes', body: 'Everything the household has jotted. Edit in place; check off list items together.' },
   ],
   '/calendar': [
