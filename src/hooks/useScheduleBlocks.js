@@ -89,14 +89,27 @@ export function useScheduleBlocks(householdId) {
 
   const updateBlock = useCallback(async (id, patch) => {
     const prev = cache.blocks ?? [];
-    setAll(prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-    const { error } = await supabase
-      .from('schedule_blocks')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) {
+    const gid = prev.find((b) => b.id === id)?.group_id || null;
+    // For a joint block, time/title/category edits cascade to the whole group;
+    // a member reassignment (member_id) stays on just the dragged instance.
+    const { member_id, ...shared } = patch;
+    const cascade = gid && Object.keys(shared).length > 0;
+
+    setAll(prev.map((b) => {
+      if (b.id === id) return { ...b, ...patch };
+      if (cascade && b.group_id === gid) return { ...b, ...shared };
+      return b;
+    }));
+
+    const stamp = new Date().toISOString();
+    const { error } = await supabase.from('schedule_blocks').update({ ...patch, updated_at: stamp }).eq('id', id);
+    let error2 = null;
+    if (!error && cascade) {
+      ({ error: error2 } = await supabase.from('schedule_blocks').update({ ...shared, updated_at: stamp }).eq('group_id', gid).neq('id', id));
+    }
+    if (error || error2) {
       setAll(prev);
-      throw error;
+      throw error || error2;
     }
   }, []);
 
