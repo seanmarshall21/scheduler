@@ -2,16 +2,24 @@ import { useRef, useState } from 'react';
 import { Camera, Check, ListChecks, Loader2, Plus, StickyNote, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useNotes } from '../hooks/useNotes';
+import { useTasks } from '../hooks/useTasks';
+import { useEvents } from '../hooks/useEvents';
 import { supabase } from '../lib/supabase';
 import { downscaleImage } from '../lib/image';
+import CaptureReview from '../components/capture/CaptureReview';
 
 // Household notes + shared checklists everyone can add to / check off.
 export default function Notes() {
-  const { household, activeMemberId } = useApp();
+  const { household, activeMemberId, members } = useApp();
   const { notes, add, update, toggleItem, addItem, remove } = useNotes(household?.id);
+  const { addTask } = useTasks(household?.id);
+  const { addEvent } = useEvents(household?.id);
   const [draft, setDraft] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [capture, setCapture] = useState(null);
   const scanInput = useRef(null);
+
+  const mkItems = (arr) => arr.map((text, i) => ({ id: `i-${Date.now()}-${i}`, text, done: false }));
 
   const addNote = (kind) => {
     if (kind === 'note' && !draft.trim()) return;
@@ -25,7 +33,7 @@ export default function Notes() {
     setDraft('');
   };
 
-  // Snap a photo of a handwritten/printed list → clean structured list/note.
+  // Snap a photo/screenshot of ANYTHING → classify → review sheet → route.
   const onScan = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -34,25 +42,37 @@ export default function Notes() {
     try {
       const image = await downscaleImage(file, 1600, 0.8);
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await fetch('/.netlify/functions/scan-note', {
+      const res = await fetch('/.netlify/functions/capture', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, kind: 'auto' }),
+        body: JSON.stringify({
+          image,
+          context: {
+            today: new Date().toISOString().slice(0, 10),
+            members: members.map((m) => ({ name: m.name })),
+            lists: notes.filter((n) => n.kind === 'list').map((n) => ({ title: n.title })),
+          },
+        }),
       });
       const out = await res.json();
       if (out.error) { window.alert(out.error); return; }
-      await add({
-        kind: out.kind,
-        title: out.title,
-        body: out.kind === 'note' ? out.body : null,
-        items: out.kind === 'list' ? (out.items || []).map((text, i) => ({ id: `i-${Date.now()}-${i}`, text, done: false })) : [],
-        created_by: activeMemberId || null,
-      });
+      setCapture(out);
     } catch {
       window.alert('Scan failed — try again with a clearer photo.');
     } finally {
       setScanning(false);
     }
+  };
+
+  const captureHandlers = {
+    createEvent: (row) => addEvent({ ...row, created_by: activeMemberId || null }),
+    createTask: (row) => addTask({ ...row, created_by: activeMemberId || null }),
+    createList: ({ title, items }) => add({ kind: 'list', title, items: mkItems(items), created_by: activeMemberId || null }),
+    appendList: (noteId, items) => {
+      const note = notes.find((n) => n.id === noteId);
+      return update(noteId, { items: [...(note?.items || []), ...mkItems(items)] });
+    },
+    createNote: ({ title, body }) => add({ kind: 'note', title, body, created_by: activeMemberId || null }),
   };
 
   return (
@@ -61,13 +81,23 @@ export default function Notes() {
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Jot a note or start a list…"
           className="cd-input flex-1" onKeyDown={(e) => e.key === 'Enter' && addNote('note')} />
         <input ref={scanInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={onScan} />
-        <button onClick={() => scanInput.current?.click()} disabled={scanning} className="cd-btn cd-btn--secondary shrink-0 disabled:opacity-60" title="Scan a photo of a list or note">
+        <button onClick={() => scanInput.current?.click()} disabled={scanning} className="cd-btn cd-btn--secondary shrink-0 disabled:opacity-60" title="Scan anything — a list, note, plan, or to-do">
           {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
         </button>
         <button onClick={() => addNote('note')} className="cd-btn cd-btn--secondary shrink-0" title="Add note"><StickyNote className="h-4 w-4" /></button>
         <button onClick={() => addNote('list')} className="cd-btn cd-btn--accent shrink-0" title="Start list"><ListChecks className="h-4 w-4" /></button>
       </div>
       {scanning && <p className="cd-mono-label -mt-1 px-1">reading your photo…</p>}
+      {capture && (
+        <CaptureReview
+          initial={capture}
+          members={members}
+          lists={notes.filter((n) => n.kind === 'list')}
+          defaultMemberId={activeMemberId}
+          handlers={captureHandlers}
+          onClose={() => setCapture(null)}
+        />
+      )}
 
       <div data-tour="note-grid" className="cd-scroll grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {notes.length === 0 && <p className="cd-mono-label col-span-full py-10 text-center">nothing here yet</p>}
