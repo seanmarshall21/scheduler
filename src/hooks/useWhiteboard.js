@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useApp } from '../context/AppContext';
 
 // The household's "fridge" — now MULTIPLE boards (saved views). Module-cached so
 // the home tile + sign-in popup + editor share one fetch. The active board is
@@ -10,6 +11,7 @@ const STALE_MS = 30_000;
 const activeKey = (hid) => `commons.fridge.active.${hid || 'default'}`;
 
 export function useWhiteboard(householdId) {
+  const { activeMemberId } = useApp();
   const valid = cache.householdId === householdId && cache.boards !== undefined;
   const [boards, setBoards] = useState(valid ? cache.boards : []);
   const [activeId, setActiveIdState] = useState(() => {
@@ -53,7 +55,12 @@ export function useWhiteboard(householdId) {
     else if (Date.now() - cache.at > STALE_MS) load({ background: true });
   }, [householdId, load]);
 
-  const active = boards.find((b) => b.id === activeId) || boards[0] || null;
+  // Member-scoped visibility (soft): household boards for all; private/shared only
+  // for their owner / listed members (based on the active "who am I" member).
+  const canSee = (b) => b.visibility === 'household' || !b.owner_id
+    || (activeMemberId && (b.owner_id === activeMemberId || (b.shared_with || []).includes(activeMemberId)));
+  const visibleBoards = boards.filter(canSee);
+  const active = visibleBoards.find((b) => b.id === activeId) || visibleBoards[0] || null;
 
   const setActive = useCallback((id) => {
     setActiveIdState(id);
@@ -62,12 +69,20 @@ export function useWhiteboard(householdId) {
 
   const createBoard = useCallback(async (name) => {
     const sort = (cache.boards ?? []).reduce((m, b) => Math.max(m, b.sort_order || 0), 0) + 1;
-    const { data, error } = await supabase.from('fridge_boards').insert({ household_id: householdId, name: name || 'Board', sort_order: sort }).select().single();
+    const { data, error } = await supabase.from('fridge_boards')
+      .insert({ household_id: householdId, name: name || 'Board', sort_order: sort, owner_id: activeMemberId || null })
+      .select().single();
     if (error) throw error;
     setAll([...(cache.boards ?? []), data]);
     setActive(data.id);
     return data;
-  }, [householdId, setActive]);
+  }, [householdId, activeMemberId, setActive]);
+
+  const setVisibility = useCallback(async (id, { visibility, shared_with }) => {
+    const patch = { visibility, shared_with: shared_with || [] };
+    setAll((cache.boards ?? []).map((b) => (b.id === id ? { ...b, ...patch } : b)));
+    await supabase.from('fridge_boards').update(patch).eq('id', id);
+  }, []);
 
   const renameBoard = useCallback(async (id, name) => {
     setAll((cache.boards ?? []).map((b) => (b.id === id ? { ...b, name } : b)));
@@ -92,7 +107,7 @@ export function useWhiteboard(householdId) {
   }, []);
 
   return {
-    boards,
+    boards: visibleBoards,
     loading,
     active,
     activeId: active?.id || null,
@@ -100,6 +115,7 @@ export function useWhiteboard(householdId) {
     createBoard,
     renameBoard,
     deleteBoard,
+    setVisibility,
     save,
     reload: () => load({ background: true }),
     // active-board content for read-only consumers (home tile, sign-in popup)

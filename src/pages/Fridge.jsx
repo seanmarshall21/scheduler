@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BringToFront, CalendarClock, Camera, Check, ChevronLeft, ImagePlus, Link2, ListChecks, Pencil, Plus, SendToBack, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
+import { BringToFront, CalendarClock, Camera, Check, ChevronLeft, Globe, ImagePlus, Link2, ListChecks, Lock, Pencil, Plus, SendToBack, Trash2, Type, Undo2, Users, X, Hand } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useWhiteboard } from '../hooks/useWhiteboard';
 import { useNotes } from '../hooks/useNotes';
@@ -9,6 +9,7 @@ import { useEvents, expandEvents } from '../hooks/useEvents';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useWorkSchedule } from '../hooks/useWorkSchedule';
 import { useCalendars } from '../hooks/useCalendars';
+import MemberChip from '../components/members/MemberChip';
 
 const listHeader = (raw) => {
   const t = (raw || '').trim();
@@ -96,7 +97,7 @@ function downscale(file, maxDim = 800, quality = 0.72) {
 
 export default function Fridge() {
   const { household, activeMemberId, members } = useApp();
-  const { boards, active, loading, save, setActive, createBoard, renameBoard, deleteBoard } = useWhiteboard(household?.id);
+  const { boards, active, loading, save, setActive, createBoard, renameBoard, deleteBoard, setVisibility } = useWhiteboard(household?.id);
   const { notes, toggleItem } = useNotes(household?.id);
   const { blocks } = useScheduleBlocks(household?.id);
   const { events: appRaw } = useEvents(household?.id);
@@ -111,6 +112,7 @@ export default function Fridge() {
   const [editingId, setEditingId] = useState(null);
   const [curBoardId, setCurBoardId] = useState(null);
   const [picker, setPicker] = useState(null); // 'list' | 'event' | null
+  const [shareOpen, setShareOpen] = useState(false);
 
   const lists = notes.filter((n) => n.kind === 'list');
   const notesById = new Map(notes.map((n) => [n.id, n]));
@@ -371,6 +373,11 @@ export default function Fridge() {
           </button>
         ))}
         <button onClick={newBoard} aria-label="New board" title="New board" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-surface-3 text-text-3 hover:bg-surface-1"><Plus className="h-4 w-4" /></button>
+        {active && (
+          <button onClick={() => setShareOpen(true)} aria-label="Board sharing" title="Who can see this board" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-surface-3 text-text-3 hover:bg-surface-1">
+            {active.visibility === 'private' ? <Lock className="h-3.5 w-3.5" /> : active.visibility === 'shared' ? <Users className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+          </button>
+        )}
         {boards.length > 1 && (
           <button onClick={deleteActiveBoard} aria-label="Delete board" title="Delete this board" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-surface-3 text-text-3 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
         )}
@@ -497,6 +504,54 @@ export default function Fridge() {
       <p className="text-center text-xs text-text-3">
         {mode === 'draw' ? 'Drawing — pick a color and doodle. Switch to Move to add notes, lists & photos.' : 'Drag to move, corner to resize. Double-tap a note to edit or a link to open. Pin lists, appointments, links & photos. Use the chips above to switch or add boards.'}
       </p>
+
+      {shareOpen && active && (
+        <div className="fixed inset-0 z-[160] flex items-end justify-center sm:items-center" onClick={() => setShareOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative max-h-[75vh] w-full max-w-md overflow-auto rounded-t-2xl border border-surface-3 bg-bg p-3 pb-safe shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h3 className="text-base font-bold text-text">Who can see “{active.name}”?</h3>
+              <button onClick={() => setShareOpen(false)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {[['household', 'Everyone in the household', Globe], ['private', 'Just me', Lock], ['shared', 'Choose people', Users]].map(([v, label, Icon]) => (
+                <button
+                  key={v}
+                  onClick={() => setVisibility(active.id, { visibility: v, shared_with: v === 'shared' ? (active.shared_with || []) : [] })}
+                  className={`flex items-center gap-2.5 rounded-btn border p-2.5 text-left transition-colors ${active.visibility === v ? 'border-[#e08a3c] bg-surface-1' : 'border-surface-3 hover:bg-surface-1'}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0 text-text-2" />
+                  <span className="flex-1 text-sm font-medium text-text">{label}</span>
+                  {active.visibility === v && <Check className="h-4 w-4 text-[#e08a3c]" />}
+                </button>
+              ))}
+              {active.visibility === 'shared' && (
+                <div className="mt-1 flex flex-col gap-1 border-t border-surface-2 pt-2">
+                  <span className="cd-mono-label px-1">share with</span>
+                  {members.map((m) => {
+                    const on = (active.shared_with || []).includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          const cur = active.shared_with || [];
+                          setVisibility(active.id, { visibility: 'shared', shared_with: on ? cur.filter((x) => x !== m.id) : [...cur, m.id] });
+                        }}
+                        className="flex items-center gap-2.5 rounded-btn p-2 text-left hover:bg-surface-1"
+                      >
+                        <input type="checkbox" checked={on} readOnly className="h-4 w-4 shrink-0" />
+                        <MemberChip member={m} size={24} />
+                        <span className="text-sm text-text">{m.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <p className="mt-2 px-1 text-xs text-text-3">Boards are scoped by member (the who-am-I identity) to keep things tidy per person — handy on the shared screen, not hard security.</p>
+          </div>
+        </div>
+      )}
 
       {picker && (
         <div className="fixed inset-0 z-[160] flex items-end justify-center sm:items-center" onClick={() => setPicker(null)}>
