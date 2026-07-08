@@ -1,8 +1,58 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BringToFront, Camera, ChevronLeft, ImagePlus, Pencil, SendToBack, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
+import { BringToFront, CalendarClock, Camera, Check, ChevronLeft, ImagePlus, ListChecks, Pencil, SendToBack, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useWhiteboard } from '../hooks/useWhiteboard';
+import { useNotes } from '../hooks/useNotes';
+import { useScheduleBlocks } from '../hooks/useScheduleBlocks';
+import { useEvents, expandEvents } from '../hooks/useEvents';
+import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useWorkSchedule } from '../hooks/useWorkSchedule';
+import { useCalendars } from '../hooks/useCalendars';
+
+const listHeader = (raw) => {
+  const t = (raw || '').trim();
+  const m = t.match(/^#{1,6}\s+(.+?)\s*$/) || t.match(/^\*\*(.+?)\*\*:?\s*$/);
+  return m ? m[1] : null;
+};
+const cleanListItem = (raw) => (raw || '').replace(/^\s*[-*+]\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+
+// Live grocery/checklist card pinned on the board (references a household list).
+function FridgeList({ note, onToggle }) {
+  if (!note) return <div className="h-full w-full rounded-[10px] bg-white p-3 text-sm text-text-3 shadow ring-1 ring-surface-3">List removed</div>;
+  const items = note.items || [];
+  return (
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-[10px] bg-white p-2.5 shadow ring-1 ring-surface-3">
+      <div className="mb-1 flex items-center gap-1.5 text-sm font-bold text-text"><ListChecks className="h-4 w-4 shrink-0 text-[#e08a3c]" /> <span className="truncate">{note.title || 'List'}</span></div>
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
+        {!items.length && <span className="text-xs text-text-3">Empty list</span>}
+        {items.map((i) => {
+          const h = listHeader(i.text);
+          if (h) return <div key={i.id} className="mt-1 text-[10px] font-bold uppercase tracking-wide text-text-3">{h}</div>;
+          return (
+            <button key={i.id} onPointerDown={(e) => { e.stopPropagation(); onToggle(note, i.id); }} className="flex items-center gap-1.5 text-left">
+              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${i.done ? 'border-transparent bg-text text-white' : 'border-surface-4'}`}>{i.done && <Check className="h-2.5 w-2.5" />}</span>
+              <span className={`truncate text-xs ${i.done ? 'text-text-3 line-through' : 'text-text'}`}>{cleanListItem(i.text)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// A pinned appointment reminder (snapshot of a scheduled item).
+function FridgeEvent({ item }) {
+  return (
+    <div className="flex h-full w-full items-stretch gap-2 overflow-hidden rounded-[10px] bg-white p-2.5 shadow ring-1 ring-surface-3">
+      <span className="w-1.5 shrink-0 rounded-full" style={{ backgroundColor: item.color || '#e08a3c' }} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 font-mono text-[10px] uppercase text-text-3"><CalendarClock className="h-3 w-3" /> {item.when}</div>
+        <div className="truncate text-sm font-bold text-text">{item.title}</div>
+      </div>
+    </div>
+  );
+}
 
 const PEN_COLORS = ['#37322b', '#e0603c', '#3c8fe0', '#3ca06a', '#9b5de5', '#e0a83c'];
 const NOTE_COLORS = ['#ffe9a8', '#ffd0c4', '#cfe6ff', '#d4f0dc', '#e9dcff', '#ffe0ef'];
@@ -30,8 +80,14 @@ function downscale(file, maxDim = 800, quality = 0.72) {
 }
 
 export default function Fridge() {
-  const { household, activeMemberId } = useApp();
+  const { household, activeMemberId, members } = useApp();
   const { strokes: initStrokes, items: initItems, loading, save } = useWhiteboard(household?.id);
+  const { notes, toggleItem } = useNotes(household?.id);
+  const { blocks } = useScheduleBlocks(household?.id);
+  const { events: appRaw } = useEvents(household?.id);
+  const { calendars } = useCalendars(household?.id);
+  const { events: gcalEvents } = useGoogleCalendar();
+  const { events: workEvents } = useWorkSchedule();
   const [strokes, setStrokes] = useState([]);
   const [items, setItems] = useState([]);
   const [mode, setMode] = useState('move'); // 'move' | 'draw'
@@ -39,6 +95,40 @@ export default function Fridge() {
   const [selectedId, setSelectedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [ready, setReady] = useState(false);
+  const [picker, setPicker] = useState(null); // 'list' | 'event' | null
+
+  const lists = notes.filter((n) => n.kind === 'list');
+  const notesById = new Map(notes.map((n) => [n.id, n]));
+
+  // Upcoming scheduled items (next 14 days) to pin as appointment cards.
+  const upcoming = useMemo(() => {
+    const memberById = new Map(members.map((m) => [m.id, m]));
+    const now = Date.now();
+    const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+    const t0 = day0.getTime();
+    const t1 = now + 14 * 86_400_000;
+    const calById = new Map((calendars || []).map((c) => [c.id, c]));
+    const fmtWhen = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const out = [];
+    for (const b of blocks || []) {
+      if (b.start_min == null) continue;
+      const ms = new Date(`${b.day}T00:00`).getTime() + b.start_min * 60_000;
+      if (ms < now || ms > t1) continue;
+      out.push({ key: `b-${b.id}`, ms, title: b.title, color: memberById.get(b.member_id)?.color });
+    }
+    for (const e of expandEvents(appRaw || [], { fromMs: t0, toMs: t1, calendarsById: calById })) {
+      const ms = new Date(e.start).getTime();
+      if (e.allDay || ms < now || ms > t1) continue;
+      out.push({ key: `a-${e.id || e.summary}-${ms}`, ms, title: e.summary, color: e.color || memberById.get(e.member_id)?.color });
+    }
+    for (const e of [...(gcalEvents || []), ...(workEvents || [])]) {
+      const ms = new Date(e.start).getTime();
+      if (e.allDay || ms < now || ms > t1) continue;
+      out.push({ key: `g-${e.id || e.summary}-${ms}`, ms, title: e.summary, color: e.color || memberById.get(e.member_id)?.color });
+    }
+    out.sort((a, z) => a.ms - z.ms);
+    return out.slice(0, 40).map((x) => ({ ...x, when: fmtWhen(x.ms) }));
+  }, [blocks, appRaw, calendars, gcalEvents, workEvents, members]);
 
   const boardRef = useRef(null);
   const canvasRef = useRef(null);
@@ -168,6 +258,17 @@ export default function Fridge() {
       setMode('move'); setSelectedId(id);
     } catch { /* ignore */ }
   };
+  const addList = (noteId) => {
+    const n = notesById.get(noteId);
+    const id = uid();
+    setItems((arr) => [...arr, { id, type: 'list', noteId, title: n?.title || 'List', x: 330, y: 130, w: 300, h: 260, rot: Math.random() * 4 - 2 }]);
+    setPicker(null); setMode('move'); setSelectedId(id);
+  };
+  const addEventCard = (ev) => {
+    const id = uid();
+    setItems((arr) => [...arr, { id, type: 'event', title: ev.title, when: ev.when, color: ev.color || '#e08a3c', x: 350, y: 150, w: 300, h: 110, rot: Math.random() * 4 - 2 }]);
+    setPicker(null); setMode('move'); setSelectedId(id);
+  };
 
   const startDrag = (e, it, kind) => {
     e.stopPropagation();
@@ -224,6 +325,8 @@ export default function Fridge() {
         <button onClick={addNote} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><Type className="h-4 w-4" /> Note</button>
         <button onClick={() => imgInput.current?.click()} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><ImagePlus className="h-4 w-4" /> Image</button>
         <button onClick={() => photoInput.current?.click()} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><Camera className="h-4 w-4" /> Photo</button>
+        <button onClick={() => setPicker('list')} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><ListChecks className="h-4 w-4" /> List</button>
+        <button onClick={() => setPicker('event')} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><CalendarClock className="h-4 w-4" /> Pin</button>
 
         {mode === 'draw' && (
           <div className="flex items-center gap-1.5">
@@ -276,6 +379,10 @@ export default function Fridge() {
               >
                 {it.type === 'image' ? (
                   <img src={it.src} alt="" draggable={false} className="h-full w-full select-none rounded-[10px] object-cover shadow" />
+                ) : it.type === 'list' ? (
+                  <FridgeList note={notesById.get(it.noteId)} onToggle={toggleItem} />
+                ) : it.type === 'event' ? (
+                  <FridgeEvent item={it} />
                 ) : editing ? (
                   <textarea
                     autoFocus
@@ -325,8 +432,45 @@ export default function Fridge() {
       </div>
 
       <p className="text-center text-xs text-text-3">
-        {mode === 'draw' ? 'Drawing — pick a color and doodle. Switch to Move to add notes & photos.' : 'Tap an item to select; drag to move, corner to resize, double-tap a note to edit.'}
+        {mode === 'draw' ? 'Drawing — pick a color and doodle. Switch to Move to add notes, lists & photos.' : 'Tap an item to select; drag to move, corner to resize, double-tap a note to edit. Pin a list or appointment for a live reminder.'}
       </p>
+
+      {picker && (
+        <div className="fixed inset-0 z-[160] flex items-end justify-center sm:items-center" onClick={() => setPicker(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative max-h-[75vh] w-full max-w-md overflow-auto rounded-t-2xl border border-surface-3 bg-bg p-3 pb-safe shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h3 className="text-base font-bold text-text">{picker === 'list' ? 'Pin a list' : 'Pin an appointment'}</h3>
+              <button onClick={() => setPicker(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-text-3 hover:bg-surface-1"><X className="h-4 w-4" /></button>
+            </div>
+            {picker === 'list' ? (
+              <div className="flex flex-col gap-1.5">
+                {!lists.length && <p className="cd-mono-label py-6 text-center">no lists yet — make one in Notes &amp; Lists</p>}
+                {lists.map((l) => (
+                  <button key={l.id} onClick={() => addList(l.id)} className="flex items-center gap-2.5 rounded-btn border border-surface-3 p-2.5 text-left hover:bg-surface-1">
+                    <ListChecks className="h-4 w-4 shrink-0 text-[#e08a3c]" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-text">{l.title || 'Untitled list'}</span>
+                    <span className="cd-mono-label shrink-0">{(l.items || []).filter((i) => !listHeader(i.text)).length} items</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {!upcoming.length && <p className="cd-mono-label py-6 text-center">nothing scheduled in the next two weeks</p>}
+                {upcoming.map((ev) => (
+                  <button key={ev.key} onClick={() => addEventCard(ev)} className="flex items-center gap-2.5 rounded-btn border border-surface-3 p-2.5 text-left hover:bg-surface-1">
+                    <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: ev.color || '#e08a3c' }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-text">{ev.title}</span>
+                      <span className="font-mono text-[10px] text-text-3">{ev.when}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
