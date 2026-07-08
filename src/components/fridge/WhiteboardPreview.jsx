@@ -19,17 +19,20 @@ export default function WhiteboardPreview({ strokes = [], items = [], className 
         if (it.type === 'image') {
           return <image key={it.id} href={it.src} x={it.x} y={it.y} width={it.w} height={it.h} transform={t} preserveAspectRatio="xMidYMid slice" />;
         }
-        if (it.type === 'list' || it.type === 'event') {
+        if (it.type === 'list' || it.type === 'event' || it.type === 'link') {
+          let host = '';
+          if (it.type === 'link') { try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch { host = it.url || ''; } }
+          const title = it.type === 'list' ? `📋 ${it.title || 'List'}` : it.type === 'link' ? `🔗 ${it.title || host}` : it.title;
+          const sub = it.type === 'event' ? it.when : it.type === 'link' ? host : '';
+          const bar = it.type === 'link' ? '#3c8fe0' : (it.color || '#e08a3c');
           return (
             <g key={it.id} transform={t}>
               <rect x={it.x} y={it.y} width={it.w} height={it.h} rx={10} fill="#ffffff" stroke="#e4ddd0" />
-              <rect x={it.x} y={it.y} width={10} height={it.h} rx={5} fill={it.color || '#e08a3c'} />
+              <rect x={it.x} y={it.y} width={10} height={it.h} rx={5} fill={bar} />
               <foreignObject x={it.x + 16} y={it.y} width={Math.max(20, it.w - 24)} height={it.h}>
                 <div xmlns="http://www.w3.org/1999/xhtml" style={{ padding: '10px 4px', color: '#37322b', overflow: 'hidden', height: '100%' }}>
-                  <div style={{ font: '700 26px/1.2 "DM Sans", sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {it.type === 'list' ? `📋 ${it.title || 'List'}` : it.title}
-                  </div>
-                  {it.type === 'event' && <div style={{ font: '600 20px "DM Mono", monospace', color: '#8a8172', marginTop: 4 }}>{it.when}</div>}
+                  <div style={{ font: '700 26px/1.2 "DM Sans", sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
+                  {sub && <div style={{ font: '600 20px "DM Mono", monospace', color: '#8a8172', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
                 </div>
               </foreignObject>
             </g>

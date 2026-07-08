@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BringToFront, CalendarClock, Camera, Check, ChevronLeft, ImagePlus, ListChecks, Pencil, SendToBack, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
+import { BringToFront, CalendarClock, Camera, Check, ChevronLeft, ImagePlus, Link2, ListChecks, Pencil, Plus, SendToBack, Trash2, Type, Undo2, X, Hand } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useWhiteboard } from '../hooks/useWhiteboard';
 import { useNotes } from '../hooks/useNotes';
@@ -37,6 +37,21 @@ function FridgeList({ note, onToggle }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// A pinned link (double-tap to open).
+function FridgeLink({ item }) {
+  let host = item.url;
+  try { host = new URL(item.url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+  return (
+    <div className="flex h-full w-full items-center gap-2 overflow-hidden rounded-[10px] bg-white p-2.5 shadow ring-1 ring-surface-3">
+      <Link2 className="h-4 w-4 shrink-0 text-[#3c8fe0]" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-text">{item.title || host}</span>
+        <span className="block truncate text-[10px] text-text-3">{host}</span>
+      </span>
     </div>
   );
 }
@@ -81,7 +96,7 @@ function downscale(file, maxDim = 800, quality = 0.72) {
 
 export default function Fridge() {
   const { household, activeMemberId, members } = useApp();
-  const { strokes: initStrokes, items: initItems, loading, save } = useWhiteboard(household?.id);
+  const { boards, active, loading, save, setActive, createBoard, renameBoard, deleteBoard } = useWhiteboard(household?.id);
   const { notes, toggleItem } = useNotes(household?.id);
   const { blocks } = useScheduleBlocks(household?.id);
   const { events: appRaw } = useEvents(household?.id);
@@ -94,7 +109,7 @@ export default function Fridge() {
   const [penColor, setPenColor] = useState(PEN_COLORS[0]);
   const [selectedId, setSelectedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [ready, setReady] = useState(false);
+  const [curBoardId, setCurBoardId] = useState(null);
   const [picker, setPicker] = useState(null); // 'list' | 'event' | null
 
   const lists = notes.filter((n) => n.kind === 'list');
@@ -138,14 +153,18 @@ export default function Fridge() {
   const photoInput = useRef(null);
   const navigate = useNavigate();
 
-  // Seed local state from the loaded board once (dropping any corrupt entries).
+  // Seed local editing state from the active board — and re-seed when you switch
+  // boards (dropping any corrupt entries).
   useEffect(() => {
-    if (!loading && !ready) {
-      setStrokes((initStrokes || []).filter((s) => s && Array.isArray(s.p)));
-      setItems((initItems || []).filter(Boolean));
-      setReady(true);
+    if (loading || !active) return;
+    if (active.id !== curBoardId) {
+      setStrokes((active.strokes || []).filter((s) => s && Array.isArray(s.p)));
+      setItems((active.items || []).filter(Boolean));
+      setCurBoardId(active.id);
+      setSelectedId(null);
+      setEditingId(null);
     }
-  }, [loading, initStrokes, initItems, ready]);
+  }, [loading, active, curBoardId]);
 
   // ── Drawing layer ──────────────────────────────────────────────────────────
   // Read live strokes through a ref so the ResizeObserver / redraw callbacks
@@ -200,14 +219,14 @@ export default function Fridge() {
 
   // ── Persistence (debounced) ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!ready) return undefined;
+    if (!curBoardId) return undefined;
     const t = setTimeout(async () => {
-      const row = await save(strokes, items, activeMemberId).catch(() => null);
+      const row = await save(curBoardId, strokes, items, activeMemberId).catch(() => null);
       if (row && household?.id) localStorage.setItem(SEEN_KEY(household.id), row.updated_at);
     }, 700);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, items, ready]);
+  }, [strokes, items, curBoardId]);
 
   const toV = (e) => {
     const el = boardRef.current;
@@ -292,9 +311,32 @@ export default function Fridge() {
   const endDrag = () => { drag.current = null; };
 
   const done = async () => {
-    const row = await save(strokes, items, activeMemberId).catch(() => null);
+    const row = await save(curBoardId, strokes, items, activeMemberId).catch(() => null);
     if (row && household?.id) localStorage.setItem(SEEN_KEY(household.id), row.updated_at);
     navigate('/');
+  };
+
+  // ── Multiple boards ─────────────────────────────────────────────────────────
+  const flush = () => save(curBoardId, strokes, items, activeMemberId).catch(() => {});
+  const switchBoard = async (id) => { if (id === curBoardId) return; await flush(); setActive(id); };
+  const newBoard = async () => {
+    const name = window.prompt('Name this board', `Board ${boards.length + 1}`);
+    if (!name || !name.trim()) return;
+    await flush();
+    createBoard(name.trim());
+  };
+  const renameActiveBoard = () => { if (!active) return; const name = window.prompt('Board name', active.name); if (name && name.trim()) renameBoard(active.id, name.trim()); };
+  const deleteActiveBoard = () => { if (active && boards.length > 1 && window.confirm(`Delete board “${active.name}”?`)) deleteBoard(active.id); };
+
+  const addLink = () => {
+    let url = window.prompt('Paste a link (URL)');
+    if (!url || !url.trim()) return;
+    url = url.trim();
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    const label = (window.prompt('Label (optional)', '') || '').trim();
+    const id = uid();
+    setItems((arr) => [...arr, { id, type: 'link', url, title: label, x: 340, y: 150, w: 300, h: 90, rot: Math.random() * 4 - 2 }]);
+    setMode('move'); setSelectedId(id);
   };
 
   const pct = (v, span) => `${(v / span) * 100}%`;
@@ -316,6 +358,24 @@ export default function Fridge() {
         </div>
       </div>
 
+      {/* Board switcher (saved views) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto">
+        {boards.map((b) => (
+          <button
+            key={b.id}
+            onClick={() => switchBoard(b.id)}
+            onDoubleClick={() => { if (b.id === curBoardId) renameActiveBoard(); }}
+            className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${b.id === curBoardId ? 'border-[#e08a3c] bg-surface-1 text-text' : 'border-surface-3 text-text-2 hover:bg-surface-1'}`}
+          >
+            {b.name}
+          </button>
+        ))}
+        <button onClick={newBoard} aria-label="New board" title="New board" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-surface-3 text-text-3 hover:bg-surface-1"><Plus className="h-4 w-4" /></button>
+        {boards.length > 1 && (
+          <button onClick={deleteActiveBoard} aria-label="Delete board" title="Delete this board" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-surface-3 text-text-3 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+        )}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-full border border-surface-3 p-0.5">
@@ -327,6 +387,7 @@ export default function Fridge() {
         <button onClick={() => photoInput.current?.click()} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><Camera className="h-4 w-4" /> Photo</button>
         <button onClick={() => setPicker('list')} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><ListChecks className="h-4 w-4" /> List</button>
         <button onClick={() => setPicker('event')} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><CalendarClock className="h-4 w-4" /> Pin</button>
+        <button onClick={addLink} className="cd-btn cd-btn--secondary flex items-center gap-1.5"><Link2 className="h-4 w-4" /> Link</button>
 
         {mode === 'draw' && (
           <div className="flex items-center gap-1.5">
@@ -367,7 +428,7 @@ export default function Fridge() {
                 onPointerMove={onItemMove}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                onDoubleClick={(e) => { e.stopPropagation(); if (it.type === 'note') setEditingId(it.id); }}
+                onDoubleClick={(e) => { e.stopPropagation(); if (it.type === 'note') setEditingId(it.id); else if (it.type === 'link') window.open(it.url, '_blank', 'noopener'); }}
                 className={`absolute ${sel ? 'z-20' : 'z-10'} ${editing ? '' : 'cursor-grab active:cursor-grabbing'} ${sel ? 'outline outline-2 outline-[#e08a3c]' : ''}`}
                 style={{
                   left: pct(it.x, VW), top: pct(it.y, VH), width: pct(it.w, VW), height: pct(it.h, VH),
@@ -383,6 +444,8 @@ export default function Fridge() {
                   <FridgeList note={notesById.get(it.noteId)} onToggle={toggleItem} />
                 ) : it.type === 'event' ? (
                   <FridgeEvent item={it} />
+                ) : it.type === 'link' ? (
+                  <FridgeLink item={it} />
                 ) : editing ? (
                   <textarea
                     autoFocus
@@ -432,7 +495,7 @@ export default function Fridge() {
       </div>
 
       <p className="text-center text-xs text-text-3">
-        {mode === 'draw' ? 'Drawing — pick a color and doodle. Switch to Move to add notes, lists & photos.' : 'Tap an item to select; drag to move, corner to resize, double-tap a note to edit. Pin a list or appointment for a live reminder.'}
+        {mode === 'draw' ? 'Drawing — pick a color and doodle. Switch to Move to add notes, lists & photos.' : 'Drag to move, corner to resize. Double-tap a note to edit or a link to open. Pin lists, appointments, links & photos. Use the chips above to switch or add boards.'}
       </p>
 
       {picker && (
